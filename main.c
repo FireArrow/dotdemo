@@ -5,6 +5,7 @@
 #include <string.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
+#include <SDL2/SDL2_framerate.h>
 #include "ddclientlib/ddclient.h"
 
 #define verboseOut(...) if(verbose) printf( __VA_ARGS__ )
@@ -107,7 +108,7 @@ void drawCalibrationPattern( SDL_Renderer* renderer ) {
 
     SDL_RenderFillRects( renderer, rects, 4 );
     for( i=0; i<4; ++i ) {
-        filledPolygonRGBA( renderer, &triangles_x[i][0], &triangles_y[i][0], 3, 0x00, 0x00, 0x00, 0xAF );
+        filledPolygonRGBA( renderer, &triangles_x[i][0], &triangles_y[i][0], 3, 0x00, 0x00, 0x00, 0xFF );
     }
 
 }
@@ -132,6 +133,10 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
     char netByf[SEND_BUF_SIZE];
 
     SDL_Event event;
+
+    FPSmanager fps;
+    SDL_initFramerate( &fps );
+    SDL_setFramerate( &fps, 30 );
 
     while( !done ) {
 
@@ -173,12 +178,12 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
 
         // Draw calibration pattern
         if( show_calibrate ) {
-            SDL_SetRenderDrawColor( renderer, 0xA0, 0xA0, 0xA0, 0xFF );
+            SDL_SetRenderDrawColor( renderer, 0xFF, 0xFF, 0xFF, 0xFF );
             drawCalibrationPattern( renderer );
         }
 
         // Draw laser points to frame
-        SDL_SetRenderDrawColor( renderer, 0x00, 0x00, 0xB0, 0xFF );
+        SDL_SetRenderDrawColor( renderer, 0xFF, 0xFF, 0xFF, 0xFF );
         for( i=0; i<no_dots; ++i ) {
             x = (int)laser_point_buf[i][0];
             y = (int)laser_point_buf[i][1];
@@ -186,18 +191,21 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
                     renderer,
                     x,
                     y,
-                    10,
+                    30,
                     rand() % 0xFF,          // R
                     rand() % 0xFF,          // G
                     rand() % 0xFF,          // B
-                    10 + (rand() % 0x66)    // A
+                    0xFF                    // A
                     );
+//            SDL_RenderDrawPoint( renderer, x, y );
         }
 
         // Draw frame to screen
         SDL_RenderPresent( renderer );
+        SDL_framerateDelay( &fps );
 
     }
+
     return 0;
 }
 
@@ -205,6 +213,7 @@ char* usage_message[] = {
     "Usage:",
     "-p | --port <port> - Selects what port to listen for incommming dots",
     "-d | --display <displayNumber> - Select what display to start on",
+    "-r | --resulotion <WidthxHeight> - Set the resulotion manually. Overrides -d",
     "-v | --verbose - Turns on verbose messages"
 };
 
@@ -260,6 +269,23 @@ int main( int argc, char** argv ) {
             }
         }
 
+        // What resloution should we use? (overrides -d)
+        else if( strcmp( argv[i], "-r" ) == 0 || strcmp( argv[i], "--resolution" ) == 0 ) {
+            i += 1;
+            if( argv[i] != NULL ) {
+                char* c;
+                for( c=&argv[i][0]; *c != 'x'; ++c );
+                *c = '\0';
+                c += 1;
+                screen_w = atoi( argv[i] );
+                screen_h = atoi( c );
+                
+            }
+            else {
+                usage( -8, "Missing resolution (e.g. 1024x768)" );
+            }
+        }
+
         // Should we be verbose?
         else if( strcmp( argv[i], "-v" ) == 0 || strcmp( argv[i], "--verbose" ) == 0 ) {
             verbose = 1;
@@ -268,7 +294,7 @@ int main( int argc, char** argv ) {
     }
 
     // Init the dotdetector client
-    verboseOut( "Listening for dots on port %d", ddlistenport );
+    verboseOut( "Listening for dots on port %d\n", ddlistenport );
     ddclientfd = initDDclient( "unimplemented", ddlistenport );
 
     verboseOut( "Initiating SDL\n" );
@@ -297,17 +323,19 @@ int main( int argc, char** argv ) {
         goto error;
     }
 
-    screen_w = display_mode.w;
-    screen_h = display_mode.h;
+    if( screen_w == 0 && screen_h == 0 ) {
+        screen_w = display_mode.w;
+        screen_h = display_mode.h;
+    }
     verboseOut( "Using resolution %dx%d\n", screen_w, screen_h );
 
     verboseOut( "Creating window\n" );
     window = SDL_CreateWindow( "Dotdetector demo",
-            SDL_WINDOWPOS_CENTERED,
-            SDL_WINDOWPOS_CENTERED,
+            SDL_WINDOWPOS_UNDEFINED,
+            SDL_WINDOWPOS_UNDEFINED,
             screen_w,
             screen_h,
-            SDL_WINDOW_FULLSCREEN_DESKTOP
+            0
             );
     if( window == NULL ) {
         fprintf( stderr, "ERROR: Failed to create SDL window. Message: %s\n", SDL_GetError() );
