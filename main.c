@@ -14,8 +14,18 @@ static int pattern_size = 180;
 static int tri_offset = 30;
 static int screen_w = 0;
 static int screen_h = 0;
+static int wind_speed=5;
 
 static char verbose = 0;
+
+typedef struct Dot {
+    int x;
+    int y;
+    int y_speed;
+    int x_speed;
+    int r,b,g;
+    char keep;
+} Dot;
 
 void transformBase( float* v, const int from_dim, const int to_dim ) {
     *v = ( *v * (float)to_dim ) / (float)from_dim;
@@ -121,12 +131,26 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
     char done = 0,
          show_calibrate = 0,
          dots_updated = 0,
-         draw_mode = 0;
+         makeItRain=0,
+         draw_mode = 0,
+         flip_gravity = 0,
+         momentum=1,
+         wind = 0,
+         epilepsy = 0;
 
     int i, j,
         x, y,
         no_dots,
-        seqnr;
+        seqnr,
+        currentX=0,
+        previousX=0,
+        currentY=0,
+        previousY=0,
+        x_speed=0,
+        dot_size=30;
+    int numberOfDots=0;
+        
+    Dot dotList[1000];     
 
     float laser_point_buf[MAX_POINTS][2];
 
@@ -137,6 +161,8 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
     FPSmanager fps;
     SDL_initFramerate( &fps );
     SDL_setFramerate( &fps, 30 );
+
+    for(i=0; i<1000; i++) dotList[i].keep=0;
 
     while( !done ) {
 
@@ -150,6 +176,35 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
         no_dots = getDots( ddclientfd, &laser_point_buf[0][0], &dots_updated, &seqnr );
         if( dots_updated ) {
             transformDots( &laser_point_buf[0][0], no_dots );
+            previousX = currentX;
+            previousY = currentY;
+            currentY = (int)laser_point_buf[0][1];
+            currentX = (int)laser_point_buf[0][0];
+        }
+        
+        if(makeItRain && dots_updated && no_dots > 0) {
+            for(j=0; j<no_dots; j++){
+            for(i=0; i<1000; i++){
+                if(!dotList[i].keep){
+
+                    dotList[i].x = (int)laser_point_buf[0][0];
+                    dotList[i].y = (int)laser_point_buf[0][1];
+                    dotList[i].y_speed = (currentY-previousY)/2;
+                    dotList[i].x_speed = (currentX-previousX)/2;
+                    dotList[i].keep=1;
+                    dotList[i].r = rand() % 0xFF;
+                    dotList[i].b = rand() % 0xFF;
+                    dotList[i].g = rand() % 0xFF;
+                    ++numberOfDots;
+                    
+                    if( abs(dotList[i].x_speed) > 100) dotList[i].x_speed = 70;
+                    if( abs(dotList[i].y_speed) > 100) dotList[i].y_speed = 70;  
+                    //printf("Got dot: %d, %d\n", dotList[i].x, dotList[i].y);
+                    printf("Moment: %d\n", dotList[i].x_speed);
+                    break;
+                }
+            }
+            }
         }
 
         // Get input from SDL
@@ -172,6 +227,30 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
                         case SDLK_d:
                             draw_mode = ~draw_mode;
                             break;
+                        case SDLK_r:
+                            makeItRain = !makeItRain;
+                            break;
+                        case SDLK_w:
+                            wind = !wind;
+                            break;
+                        case SDLK_f:
+                            flip_gravity = !flip_gravity;
+                            break;
+                        case SDLK_m:
+                            momentum = !momentum;
+                            break;    
+                        case SDLK_e:
+                            epilepsy = !epilepsy;
+                            break;    
+                        case SDLK_1:
+                            dot_size = 10;
+                            break;    
+                        case SDLK_2:
+                            dot_size = 20;
+                            break;    
+                        case SDLK_3:
+                            dot_size = 30;
+                            break;    
                     }
             }
         }
@@ -184,21 +263,79 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
 
         // Draw laser points to frame
         SDL_SetRenderDrawColor( renderer, 0xFF, 0xFF, 0xFF, 0xFF );
-        for( i=0; i<no_dots; ++i ) {
-            x = (int)laser_point_buf[i][0];
-            y = (int)laser_point_buf[i][1];
-            filledCircleRGBA( 
-                    renderer,
-                    x,
-                    y,
-                    30,
-                    rand() % 0xFF,          // R
-                    rand() % 0xFF,          // G
-                    rand() % 0xFF,          // B
-                    0xFF                    // A
-                    );
-//            SDL_RenderDrawPoint( renderer, x, y );
+        
+        //Update position of all "falling" dots, even if we dont draw them.
+        for( i=0; i<1000; ++i ) {
+            if(dotList[i].keep){
+    
+                x = dotList[i].x;
+    
+                if(0>(x-(dot_size/2)) || (x+dot_size/2)>screen_w) dotList[i].x_speed = -dotList[i].x_speed; //Collision detection with edge of screen
+    
+                if(wind){ dotList[i].x = dotList[i].x + wind_speed;}
+                if(momentum){ dotList[i].x = dotList[i].x + dotList[i].x_speed; }
+                
+                x = dotList[i].x;
+                
+                y = dotList[i].y += dotList[i].y_speed;
+                
+                if(makeItRain){
+                    //Draw falling dot if enabled
+                    if(epilepsy){
+                        filledCircleRGBA( 
+                                renderer,
+                                x,
+                                y,
+                                dot_size,
+                                rand() % 0xFF,          // R
+                                rand() % 0xFF,          // G
+                                rand() % 0xFF,          // B
+                                0xFF                    // A
+                        );
+                    } else {
+                            filledCircleRGBA( 
+                                renderer,
+                                x,
+                                y,
+                                dot_size,
+                                dotList[i].r % 0xFF,    // R
+                                dotList[i].g % 0xFF,    // G
+                                dotList[i].b % 0xFF,    // B
+                                0xFF                    // A
+                        );
+                    }  
+                }
+    //          SDL_RenderDrawPoint( renderer, x, y );
+                if(!flip_gravity) dotList[i].y_speed += 2;
+                else dotList[i].y_speed -= 2;
+                
+                //Apply gravity
+                if(dotList[i].x_speed > 0) dotList[i].x_speed -= 1;
+                if(dotList[i].x_speed < 0) dotList[i].x_speed += 1;                
+                
+                if(dotList[i].y > screen_h || dotList[i].y < 0){ dotList[i].keep=0;}
+            }
         }
+        if(!makeItRain){
+            for( i=0; i<no_dots; ++i ) {
+                x = (int)laser_point_buf[i][0];
+                y = (int)laser_point_buf[i][1];
+                filledCircleRGBA( 
+                        renderer,
+                        x,
+                        y,
+                        dot_size,
+                        rand() % 0xFF,          // R
+                        rand() % 0xFF,          // G
+                        rand() % 0xFF,          // B
+                        0xFF                    // A
+                        );
+    //            SDL_RenderDrawPoint( renderer, x, y );
+            }
+        }
+        
+        
+
 
         // Draw frame to screen
         SDL_RenderPresent( renderer );
