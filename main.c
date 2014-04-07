@@ -305,7 +305,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
             //Match positions to dots, and spawn balls on all matched dots (including new dots)
             for(i=0; i<numberOfPositions; i++) {
                 
-                printf("Found dot x: %d, y: %d\n", (int)positionList[i].x, (int)positionList[i].y);
+                verboseOut("Found dot x: %d, y: %d\n", (int)positionList[i].x, (int)positionList[i].y);
                 
                 matchedDot =  matchPosition(&dotList[0], &positionList[i]);   
                 
@@ -326,6 +326,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
         applyForces(&ballList[0], physicsParams);
     
         //Draw dots
+
         for(i=0; i<DD_MAX_DOTS; i++){
             if(dotList[i].keep) drawDot( &dotList[i], renderer);
         }
