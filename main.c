@@ -7,16 +7,20 @@
 #include <SDL2/SDL2_gfxPrimitives.h>
 #include <SDL2/SDL2_framerate.h>
 #include "ddclientlib/ddclient.h"
+#include "ddclientlib/ddhelpers.h"
 
 #define verboseOut(...) if(verbose) printf( __VA_ARGS__ )
 #define TRUE 1
 #define FALSE 0
 
-#define MAX_BALLS 1000
-#define MAX_DOTS 50
+#ifndef DD_MAX_DOTS
+#define DD_MAX_DOTS 150
+#endif
 
-static int pattern_size = 180;
-static int tri_offset = 30;
+#ifndef MAX_BALLS
+#define MAX_BALLS DD_MAX_DOTS * 10
+#endif
+
 static int screen_w = 0;
 static int screen_h = 0;
 static int wind_speed=5;
@@ -53,106 +57,10 @@ typedef struct Ball {
     char keep;
 } Ball;
 
-void transformBase( float* v, const int from_dim, const int to_dim ) {
-    *v = ( *v * (float)to_dim ) / (float)from_dim;
-}
-
-void transformDots( float* laser_point_buf, int numberOfDots ) {
-    int i;
-    for( i=0; i<numberOfDots*2; i += 2 ) {
-        transformBase( &laser_point_buf[i], 640, screen_w ); // x
-        transformBase( &laser_point_buf[i+1], 480, screen_h ); // y
-    }
-}
-
-void setRect( SDL_Rect* rect, int x, int y, int w, int h ) {
-    rect->x = x;
-    rect->y = y;
-    rect->w = w;
-    rect->h = h;
-}
-
-void setPoly( Sint16* poly, size_t n, ... ) {
-    int i;
-    va_list values;
-    va_start( values, n );
-    for( i=0; i<n; ++i ) {
-        poly[i] = (Sint16) va_arg( values, int );
-    }
-    va_end( values );
-}
-
-void drawCalibrationPattern( SDL_Renderer* renderer ) {
-    static char first_run = 1;
-    int i, j;
-
-    static SDL_Rect rects[4];
-    static Sint16 triangles_x[4][3];
-    static Sint16 triangles_y[4][3];
-    if( first_run ) {
-        first_run = 0;
-        setRect( &rects[0], 0                      , 0                      , pattern_size, pattern_size );
-        setRect( &rects[1], screen_w - pattern_size, 0                      , pattern_size, pattern_size );
-        setRect( &rects[2], screen_w - pattern_size, screen_h - pattern_size, pattern_size, pattern_size );
-        setRect( &rects[3], 0                      , screen_h - pattern_size, pattern_size, pattern_size );
-
-
-        setPoly( &triangles_x[0][0], 12,
-                // Top left trinagle
-                tri_offset                              ,
-                pattern_size - tri_offset               ,
-                tri_offset                              ,
-
-                // Top right triangle
-                screen_w + tri_offset - pattern_size    ,
-                screen_w - tri_offset                   ,
-                screen_w - tri_offset                   ,
-
-                // Bottom right tringle
-                screen_w + tri_offset - pattern_size    ,
-                screen_w - tri_offset                   ,
-                screen_w - tri_offset                   ,
-
-                // Bottom left triangle
-                tri_offset                              ,
-                tri_offset                              ,
-                pattern_size - tri_offset               
-               );
-
-        setPoly( &triangles_y[0][0], 12,
-                // Top left trinagle
-                tri_offset                              ,
-                tri_offset                              ,
-                pattern_size - tri_offset               ,
-
-                // Top right triangle
-                tri_offset                              ,
-                tri_offset                              ,
-                pattern_size - tri_offset               ,
-
-                // Bottom right tringle
-                screen_h - tri_offset                   ,
-                screen_h + tri_offset - pattern_size    ,
-                screen_h - tri_offset                   ,
-
-                // Bottom left triangle
-                screen_h + tri_offset - pattern_size    ,
-                screen_h - tri_offset                   ,
-                screen_h - tri_offset
-               );
-    }
-
-    SDL_RenderFillRects( renderer, rects, 4 );
-    for( i=0; i<4; ++i ) {
-        filledPolygonRGBA( renderer, &triangles_x[i][0], &triangles_y[i][0], 3, 0x00, 0x00, 0x00, 0xFF );
-    }
-
-}
-
 void pruneDots(Dot* dotList){
 
     int i;
-    for(i=0; i<MAX_DOTS; i++){
+    for(i=0; i<DD_MAX_DOTS; i++){
         dotList[i].keep = FALSE;
         if(dotList[i].matched == TRUE) dotList[i].keep = TRUE;
         dotList[i].matched = FALSE;
@@ -186,7 +94,7 @@ Dot* addDot(Dot* dotList, Position* positionPointer){
 
     int i,j;
     
-    for(i=0; i<MAX_DOTS; i++){
+    for(i=0; i<DD_MAX_DOTS; i++){
     
         if(!dotList[i].keep){
         
@@ -219,7 +127,7 @@ Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
     //printf("Matching, x=%d, y=%d\n", x, y);
     
     //Check if point matches any dot
-    for(i=0; i<MAX_DOTS; i++){
+    for(i=0; i<DD_MAX_DOTS; i++){
         
         if(dotList[i].keep && !dotList[i].matched){ //Check .matched so we only match maximum one point per dot
             
@@ -348,14 +256,12 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
     float* positionPointer;
     
     Dot* matchedDot;
-    Position positionList[MAX_DOTS];
-    Dot dotList[MAX_DOTS];
+    Position positionList[DD_MAX_DOTS];
+    Dot dotList[DD_MAX_DOTS];
     Ball ballList[MAX_BALLS];     
     Parameters physicsParams;
 
-    float laser_point_buf[MAX_POINTS][2];
-
-    char netByf[SEND_BUF_SIZE];
+    float laser_point_buf[DD_MAX_DOTS][2];
 
     SDL_Event event;
 
@@ -364,7 +270,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
     SDL_setFramerate( &fps, 30 );
 
     for(i=0; i<MAX_BALLS; i++) ballList[i].keep=FALSE;
-    for(i=0; i<MAX_DOTS; i++) dotList[i].keep=FALSE;
+    for(i=0; i<DD_MAX_DOTS; i++) dotList[i].keep=FALSE;
     physicsParams.momentum=TRUE;
     physicsParams.flip_gravity=FALSE;
     physicsParams.wind=FALSE;
@@ -420,7 +326,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
         applyForces(&ballList[0], physicsParams);
     
         //Draw dots
-        for(i=0; i<MAX_DOTS; i++){
+        for(i=0; i<DD_MAX_DOTS; i++){
             if(dotList[i].keep) drawDot( &dotList[i], renderer);
         }
     
@@ -615,7 +521,12 @@ int main( int argc, char** argv ) {
         screen_w = display_mode.w;
         screen_h = display_mode.h;
     }
+    if( screen_w < 100 || screen_h < 100 ) {
+        fprintf( stderr, "Warning: You are using a silly low resolution!\n" );
+    }
     verboseOut( "Using resolution %dx%d\n", screen_w, screen_h );
+
+    initDDhelpers( screen_w, screen_h, fmin( screen_w, screen_h ) / 4, 10 );
 
     verboseOut( "Creating window\n" );
     window = SDL_CreateWindow( "Dotdetector demo",
