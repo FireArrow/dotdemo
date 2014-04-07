@@ -12,8 +12,13 @@
 #define TRUE 1
 #define FALSE 0
 
-#define MAX_BALLS 1000
-#define MAX_DOTS 50
+#ifndef DD_MAX_DOTS
+#define DD_MAX_DOTS 150
+#endif
+
+#ifndef MAX_BALLS
+#define MAX_BALLS DD_MAX_DOTS * 10
+#endif
 
 static int pattern_size = 180;
 static int tri_offset = 30;
@@ -152,7 +157,7 @@ void drawCalibrationPattern( SDL_Renderer* renderer ) {
 void pruneDots(Dot* dotList){
 
     int i;
-    for(i=0; i<MAX_DOTS; i++){
+    for(i=0; i<DD_MAX_DOTS; i++){
         dotList[i].keep = FALSE;
         if(dotList[i].matched == TRUE) dotList[i].keep = TRUE;
         dotList[i].matched = FALSE;
@@ -186,7 +191,7 @@ Dot* addDot(Dot* dotList, Position* positionPointer){
 
     int i,j;
     
-    for(i=0; i<MAX_DOTS; i++){
+    for(i=0; i<DD_MAX_DOTS; i++){
     
         if(!dotList[i].keep){
         
@@ -219,7 +224,7 @@ Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
     //printf("Matching, x=%d, y=%d\n", x, y);
     
     //Check if point matches any dot
-    for(i=0; i<MAX_DOTS; i++){
+    for(i=0; i<DD_MAX_DOTS; i++){
         
         if(dotList[i].keep && !dotList[i].matched){ //Check .matched so we only match maximum one point per dot
             
@@ -348,14 +353,14 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
     float* positionPointer;
     
     Dot* matchedDot;
-    Position positionList[MAX_DOTS];
-    Dot dotList[MAX_DOTS];
+    Position positionList[DD_MAX_DOTS];
+    Dot dotList[DD_MAX_DOTS];
     Ball ballList[MAX_BALLS];     
     Parameters physicsParams;
 
-    float laser_point_buf[MAX_POINTS][2];
+    float laser_point_buf[DD_MAX_DOTS][2];
 
-    char netByf[SEND_BUF_SIZE];
+    char netByf[DD_SEND_BUF_SIZE];
 
     SDL_Event event;
 
@@ -364,7 +369,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
     SDL_setFramerate( &fps, 30 );
 
     for(i=0; i<MAX_BALLS; i++) ballList[i].keep=FALSE;
-    for(i=0; i<MAX_DOTS; i++) dotList[i].keep=FALSE;
+    for(i=0; i<DD_MAX_DOTS; i++) dotList[i].keep=FALSE;
     physicsParams.momentum=TRUE;
     physicsParams.flip_gravity=FALSE;
     physicsParams.wind=FALSE;
@@ -420,7 +425,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
         applyForces(&ballList[0], physicsParams);
     
         //Draw dots
-        for(i=0; i<MAX_DOTS; i++){
+        for(i=0; i<DD_MAX_DOTS; i++){
             if(dotList[i].keep) drawDot( &dotList[i], renderer);
         }
     
