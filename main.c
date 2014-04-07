@@ -14,6 +14,9 @@
 
 #define MAX_BALLS 1000
 #define MAX_DOTS 50
+#define PI 3.14159265
+#define MAX_DECAY 1
+
 
 static int pattern_size = 180;
 static int tri_offset = 30;
@@ -40,6 +43,9 @@ typedef struct Dot {
     int y;
     int x_speed;
     int y_speed;
+    int r,b,g;
+    int decay;
+    double angle;
     char keep;
     char matched;
 } Dot;
@@ -154,7 +160,13 @@ void pruneDots(Dot* dotList){
     int i;
     for(i=0; i<MAX_DOTS; i++){
         dotList[i].keep = FALSE;
-        if(dotList[i].matched == TRUE) dotList[i].keep = TRUE;
+        if(dotList[i].matched == TRUE){ 
+            dotList[i].keep = TRUE; 
+            dotList[i].decay = MAX_DECAY; 
+        } else if (dotList[i].decay > 0) {
+            dotList[i].keep = TRUE;
+            dotList[i].decay -= 1;
+        }
         dotList[i].matched = FALSE;
     }
 
@@ -171,16 +183,17 @@ int spawnBall(Dot* dot, Ball* ballList){
             ballList[i].x = dot->x;
             ballList[i].y = dot->y;
             ballList[i].keep = TRUE;
+            ballList[i].x_speed = dot->x_speed;
+            ballList[i].y_speed = dot->y_speed;
+            
             ballList[i].r = rand() % 0xFF;
             ballList[i].b = rand() % 0xFF;
             ballList[i].g = rand() % 0xFF;
-            ballList[i].x_speed = dot->x_speed;
-            ballList[i].y_speed = dot->y_speed;
             break;
         }
-    
     }
 }
+
 
 Dot* addDot(Dot* dotList, Position* positionPointer){
 
@@ -196,58 +209,17 @@ Dot* addDot(Dot* dotList, Position* positionPointer){
             dotList[i].keep=TRUE;
             dotList[i].x_speed=0;
             dotList[i].y_speed=0;
+            dotList[i].decay = MAX_DECAY;
+            
+            dotList[i].r = rand() % 0xFF;
+            dotList[i].b = rand() % 0xFF;
+            dotList[i].g = rand() % 0xFF;
             return (Dot*) &dotList[i];
         }
     }
 }
 
 
-Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
-
-    char new_dot=TRUE;
-
-    int i,
-        x,y,
-        distance=9999,
-        temp_dist,matchedIndex,
-        x_dist, y_dist,
-        x_speed, y_speed;
-
-    x = positionPointer->x;  
-    y = positionPointer->y;
-    
-    //printf("Matching, x=%d, y=%d\n", x, y);
-    
-    //Check if point matches any dot
-    for(i=0; i<MAX_DOTS; i++){
-        
-        if(dotList[i].keep && !dotList[i].matched){ //Check .matched so we only match maximum one point per dot
-            
-            x_dist = (x-dotList[i].x)^2;
-            y_dist = (y-dotList[i].y)^2;
-        
-            temp_dist = sqrt( abs(x_dist+y_dist) );
-            
-            if(temp_dist < 15 && temp_dist<distance){ 
-            
-                distance=temp_dist; 
-                matchedIndex=i; 
-                new_dot=FALSE;
-            }
-        }
-    }
-    
-    //Return pointer to the matched dot if we found one
-    if(!new_dot){
-    
-        dotList[matchedIndex].matched=TRUE;
-        return &dotList[matchedIndex];
-    } 
-    
-    //Falling through here means make new dot!
-    return ( addDot(&dotList[0], positionPointer));
-    
-}
 
 
 void applyForces(Ball* ballList, Parameters physicsParams){
@@ -292,7 +264,7 @@ void drawBall(Ball* ball, SDL_Renderer* renderer){
                                 ball->r % 0xFF,          // R
                                 ball->g % 0xFF,          // G
                                 ball->b % 0xFF,          // B
-                                0xFF                    // A
+                                0xFF                     // A
                         );
 }
 
@@ -300,30 +272,139 @@ void drawBall(Ball* ball, SDL_Renderer* renderer){
 void drawDot(Dot* dot, SDL_Renderer* renderer){
 
                  filledCircleRGBA( renderer, dot->x, dot->y, dot_size,
-                                rand() % 0xFF,          // R
-                                rand() % 0xFF,          // G
-                                rand() % 0xFF,          // B
+                                dot->r % 0xFF,          // R
+                                dot->g % 0xFF,          // G
+                                dot->b % 0xFF,          // B
                                 0xFF                    // A
                         );
 }
 
+void drawVector(Dot* dot, SDL_Renderer* r){
 
+SDL_SetRenderDrawColor(r,255,255,255,255);
+
+    SDL_RenderDrawLine(r, dot->x, dot->y, (dot->x+5*dot->x_speed), (dot->y+5*dot->y_speed) );
+
+}
 
 void updateVector(Dot* dot, Position* positionPointer){
 
     int x_speed, y_speed,
         dot_x=dot->x, dot_y=dot->y,
         pos_x=positionPointer->x, pos_y=positionPointer->y;
-        
+    double f1,f2,temp_angle;    
+    
     //Calculate new speed
-    x_speed = (pos_x - dot_x)/2;
-    y_speed = (pos_y - dot_y)/2;    
+    x_speed = (pos_x - dot_x);
+    y_speed = (pos_y - dot_y);    
+
+    f1 = (x_speed);
+    f2 = (y_speed);
 
     //Update dot parameters
     dot->x = pos_x;
     dot->y = pos_y;
     dot->x_speed = x_speed;
     dot->y_speed = y_speed; 
+    temp_angle = atan2( f1,f2 )*180 / PI;
+    if(temp_angle < 0) temp_angle += 360;
+    dot->angle = temp_angle;
+    printf("X_speed: %d\n", dot->x_speed);
+    printf("Y_speed: %d\n", dot->y_speed);
+    printf("Angle: %f\n", dot->angle);
+    printf("************************\n");
+}
+
+Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
+
+    char new_dot=TRUE;
+
+    int i,
+        pos_x,pos_y, 
+        dot_x,dot_y,
+        matchedIndex, check_distance;
+        
+    double distance=9999,
+        predicted_distance, normal_distance, compare_distance,
+        x_dist, y_dist,
+        angle_margin=45, vector_lenght;
+    double temp_angle,point_angle;
+
+    pos_x = positionPointer->x;  
+    pos_y = positionPointer->y;
+    
+    //printf("Matching, x=%d, y=%d\n", x, y);
+    
+    //Check if point matches any dot
+    for(i=0; i<MAX_DOTS; i++){
+        //For each dot
+        if(dotList[i].keep && !dotList[i].matched){ //Check .matched so we only match maximum one point per dot
+        
+            //Get position of current dot
+            dot_x = dotList[i].x;
+            dot_y = dotList[i].y;
+            
+            //Get angle between the position and current dot
+            point_angle = atan2(pos_x-dot_x , pos_y-dot_y)*180 / PI;
+            if(point_angle < 0) temp_angle += 360;
+            
+            printf("Checking dot X: %d, Y: %d\n", dotList[i].x, dotList[i].y);
+            
+            //Get distance from predicted dot to position
+            x_dist = pow( (pos_x-dotList[i].x-(dotList[i].x_speed)*2), 2);
+            y_dist = pow( (pos_y-dotList[i].y-(dotList[i].y_speed)*2), 2);
+            predicted_distance = sqrt( abs(x_dist+y_dist) );
+            printf("Predicted Distance: %f\n", predicted_distance);
+            
+            //Get distance from actual dot to position
+            x_dist = pow( (pos_x-dotList[i].x ), 2 );
+            y_dist = pow( (pos_y-dotList[i].y ), 2 );
+            normal_distance = sqrt( abs(x_dist+y_dist) );
+            printf("Normal distance: %f\n", normal_distance);
+
+            //Get length of dot vector
+            vector_lenght = sqrt( pow(dotList[i].x_speed, 2) + pow(dotList[i].y_speed, 2) );
+
+            //Get angle of dot vector
+            temp_angle = dotList[i].angle;  
+            
+            printf("Vector lenght: %f\n", vector_lenght);
+            
+            //Check how fast dot is moving. If it moves "slow" we check a circle with radius 100 around the dot.
+            //If it moves "fast" we check a circle-arc with radius 300 and 90* angle in front of the dot.
+            if(vector_lenght < 30){ check_distance = 100; compare_distance = normal_distance; }
+            else{ check_distance = 300; compare_distance = predicted_distance; }
+            
+            printf("Angle: %f\n", temp_angle);
+            
+            if( (compare_distance < check_distance ) && compare_distance<distance){   //Find the dot closest to this "position"
+                if(check_distance > 200){
+                    if( temp_angle-angle_margin <point_angle < temp_angle+angle_margin){
+                        distance=compare_distance; 
+                        matchedIndex=i; 
+                        new_dot=FALSE;
+                        printf("Angle matching!\n");
+                    }
+                } else {
+                
+                    distance=compare_distance; 
+                    matchedIndex=i; 
+                    new_dot=FALSE;
+                }
+            }
+        }
+    }
+    
+    //Return pointer to the matched dot if we found one
+    if(!new_dot){
+    
+        dotList[matchedIndex].matched=TRUE;
+        return &dotList[matchedIndex];
+    } 
+    
+    //Falling through here means make new dot!
+    return ( addDot(&dotList[0], positionPointer));
+    
 }
 
 /**
@@ -334,8 +415,9 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
     char done = FALSE,
          show_calibrate = FALSE,
          dots_updated = FALSE,
-         makeItRain=TRUE,
+         makeItRain = FALSE,
          draw_mode = FALSE,
+         draw_vector = FALSE,
          epilepsy = FALSE;
 
     int x, y,
@@ -398,22 +480,31 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
             
             //Match positions to dots, and spawn balls on all matched dots (including new dots)
             for(i=0; i<numberOfPositions; i++) {
+                //Informative printout
+                printf("Found position x: %d, y: %d\n", (int)positionList[i].x, (int)positionList[i].y);
                 
-                printf("Found dot x: %d, y: %d\n", (int)positionList[i].x, (int)positionList[i].y);
-                
+                //Return reference to matched dot, or reference to new dot if no match was found. This is where the magic happens
                 matchedDot =  matchPosition(&dotList[0], &positionList[i]);   
                 
-                if(matchedDot->matched) updateVector(matchedDot, &positionList[i]);
+                printf("Matched with dot x: %d, y: %d\n", matchedDot->x, matchedDot->y);
                 
+                //If the position was matched to an existing dot we update the vector for that dot
+                if(matchedDot->matched) updateVector(matchedDot, &positionList[i]); 
+                
+                //Draw the vector if enabled
+                if(draw_vector) drawVector(matchedDot, renderer); 
+                
+                //Spawn a ball on the dot. The ball will be created with the same vector as the dot
                 spawnBall(matchedDot, &ballList[0]);
                 
+                //We set the dot as matched even if it was created this frame. This is to keep it form beeing pruned later
                 matchedDot->matched = TRUE;
-                positionList[i].matched=TRUE;
+                positionList[i].matched = TRUE;
 
             }
         }
 
-        //Remove all dots without match
+        //Remove all dots without match. Dots created this frame will NOT be pruned.
         pruneDots(&dotList[0]);
         
         //Apply highly advanced physics model to balls
@@ -466,6 +557,9 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
                         case SDLK_e:
                             epilepsy = !epilepsy;
                             break;    
+                        case SDLK_v:
+                            draw_vector = !draw_vector;
+                            break;
                         case SDLK_1:
                             dot_size = 10;
                             break;    
