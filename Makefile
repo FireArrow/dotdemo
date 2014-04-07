@@ -4,7 +4,7 @@ EXE=dotdemo
 CC=gcc
 
 all:
-	$(CC) $(SRC) -o $(EXE) `pkg-config --libs --cflags sdl2` $(LIBS)
+	$(CC) $(SRC) -o $(EXE) -lm `pkg-config --libs --cflags sdl2` $(LIBS)
 
 clean:
 	rm -f $(EXE)
