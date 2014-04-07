@@ -13,13 +13,9 @@
 #define TRUE 1
 #define FALSE 0
 
-<<<<<<< HEAD
-#define MAX_BALLS 1000
-#define MAX_DOTS 50
 #define PI 3.14159265
 #define MAX_DECAY 1
 
-=======
 #ifndef DD_MAX_DOTS
 #define DD_MAX_DOTS 150
 #endif
@@ -27,7 +23,6 @@
 #ifndef MAX_BALLS
 #define MAX_BALLS DD_MAX_DOTS * 10
 #endif
->>>>>>> c01fb1fa62f1b54bf908d1e12607828c45411c38
 
 static int screen_w = 0;
 static int screen_h = 0;
@@ -131,58 +126,6 @@ Dot* addDot(Dot* dotList, Position* positionPointer){
         }
     }
 }
-
-
-<<<<<<< HEAD
-=======
-Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
-
-    char new_dot=TRUE;
-
-    int i,
-        x,y,
-        distance=9999,
-        temp_dist,matchedIndex,
-        x_dist, y_dist,
-        x_speed, y_speed;
-
-    x = positionPointer->x;  
-    y = positionPointer->y;
-    
-    //printf("Matching, x=%d, y=%d\n", x, y);
-    
-    //Check if point matches any dot
-    for(i=0; i<DD_MAX_DOTS; i++){
-        
-        if(dotList[i].keep && !dotList[i].matched){ //Check .matched so we only match maximum one point per dot
-            
-            x_dist = (x-dotList[i].x)^2;
-            y_dist = (y-dotList[i].y)^2;
-        
-            temp_dist = sqrt( abs(x_dist+y_dist) );
-            
-            if(temp_dist < 15 && temp_dist<distance){ 
-            
-                distance=temp_dist; 
-                matchedIndex=i; 
-                new_dot=FALSE;
-            }
-        }
-    }
-    
-    //Return pointer to the matched dot if we found one
-    if(!new_dot){
-    
-        dotList[matchedIndex].matched=TRUE;
-        return &dotList[matchedIndex];
-    } 
-    
-    //Falling through here means make new dot!
-    return ( addDot(&dotList[0], positionPointer));
-    
-}
->>>>>>> c01fb1fa62f1b54bf908d1e12607828c45411c38
-
 
 void applyForces(Ball* ballList, Parameters physicsParams){
 
@@ -290,7 +233,7 @@ Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
         predicted_distance, normal_distance, compare_distance,
         x_dist, y_dist,
         angle_margin=45, vector_lenght;
-    double temp_angle,point_angle;
+    double vector_angle,point_angle;
 
     pos_x = positionPointer->x;  
     pos_y = positionPointer->y;
@@ -328,12 +271,12 @@ Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
             vector_lenght = sqrt( pow(dotList[i].x_speed, 2) + pow(dotList[i].y_speed, 2) );
 
             //Get angle of dot vector
-            temp_angle = dotList[i].angle;  
+            vector_angle = dotList[i].angle;  
             
             printf("Vector lenght: %f\n", vector_lenght);
             
             //Check how fast dot is moving. If it moves "slow" we check a circle with radius 100 around the dot.
-            //If it moves "fast" we check a circle-arc with radius 300 and 90* angle in front of the dot.
+            //If it moves "fast" we check a circle-arc with radius 200 and 90* angle in front of the dot.
             if(vector_lenght < 30){ check_distance = 100; compare_distance = normal_distance; }
             else{ check_distance = 300; compare_distance = predicted_distance; }
             
@@ -341,7 +284,7 @@ Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
             
             if( (compare_distance < check_distance ) && compare_distance<distance){   //Find the dot closest to this "position"
                 if(check_distance > 200){
-                    if( temp_angle-angle_margin <point_angle < temp_angle+angle_margin){
+                    if( vector_angle-angle_margin< point_angle <vector_angle+angle_margin){
                         distance=compare_distance; 
                         matchedIndex=i; 
                         new_dot=FALSE;
