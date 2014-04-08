@@ -1,4 +1,4 @@
-SRC=main.c ddclientlib/ddclient.c ddclientlib/ddhelpers.c
+SRC= ddemo_helpers.c main.c ddclientlib/ddclient.c ddclientlib/ddhelpers.c
 LIBS=-lSDL2_gfx
 PKG_CFG_LIBS=sdl2
 EXE=dotdemo
