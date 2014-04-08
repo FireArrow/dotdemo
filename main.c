@@ -26,14 +26,22 @@
 
 static int screen_w = 0;
 static int screen_h = 0;
-static int wind_speed=5;
 static int dot_size=10;
 static char verbose = 0;
 
+typedef struct Vector {
+
+    double length;
+    double angle;
+} Vector;
+
 typedef struct Parameters{
-    char momentum;
     char wind;
+    char momentum;
     char flip_gravity;
+    int wind_speed;
+    int gravity_force;
+    int friction_force;
 } Parameters;
 
 typedef struct Position {
@@ -49,7 +57,7 @@ typedef struct Dot {
     int y_speed;
     int r,b,g;
     int decay;
-    double angle;
+    Vector vector;
     char keep;
     char matched;
 } Dot;
@@ -140,7 +148,7 @@ void applyForces(Ball* ballList, Parameters physicsParams){
             if(0>(x-(dot_size/2)) || (x+dot_size/2)>screen_w) ballList[i].x_speed = -ballList[i].x_speed; 
 
             //Apply linear force on all balls
-            if(physicsParams.wind){ ballList[i].x = ballList[i].x + wind_speed;}    
+            if(physicsParams.wind){ ballList[i].x += physicsParams.wind_speed;}    
                       
             //Apply individual momentum
             if(physicsParams.momentum){ 
@@ -149,12 +157,12 @@ void applyForces(Ball* ballList, Parameters physicsParams){
             }
 
             //Apply gravity
-            if(physicsParams.flip_gravity) ballList[i].y_speed -= 2;
-            else ballList[i].y_speed += 2;
+            if(physicsParams.flip_gravity) ballList[i].y_speed -= physicsParams.gravity_force;
+            else ballList[i].y_speed += physicsParams.gravity_force;
             
             //Apply friction
-            if(ballList[i].x_speed > 0) ballList[i].x_speed -= 1;
-            if(ballList[i].x_speed < 0) ballList[i].x_speed += 1;      
+            if(ballList[i].x_speed > 0) ballList[i].x_speed -= physicsParams.friction_force;
+            if(ballList[i].x_speed < 0) ballList[i].x_speed += physicsParams.friction_force;      
                       
             //Check if ball has fallen from screen
             if(ballList[i].y > screen_h || ballList[i].y < 0){ ballList[i].keep=FALSE;}
@@ -197,43 +205,50 @@ void updateVector(Dot* dot, Position* positionPointer){
     int x_speed, y_speed,
         dot_x=dot->x, dot_y=dot->y,
         pos_x=positionPointer->x, pos_y=positionPointer->y;
-    double f1,f2,temp_angle;    
+    double f1,f2,temp_angle, vector_length;    
     
     //Calculate new speed
     x_speed = (pos_x - dot_x);
     y_speed = (pos_y - dot_y);    
 
+    //Some floats for atan
     f1 = (x_speed);
     f2 = (y_speed);
+    
+    //Calculate vector angle
+    temp_angle = atan2( f1,f2 )*180 / PI;
+    if(temp_angle < 0) temp_angle += 360;
+
+    //Calculate vector length
+    vector_length = sqrt( pow(x_speed, 2) + pow(y_speed, 2) );
 
     //Update dot parameters
     dot->x = pos_x;
     dot->y = pos_y;
     dot->x_speed = x_speed;
-    dot->y_speed = y_speed; 
-    temp_angle = atan2( f1,f2 )*180 / PI;
-    if(temp_angle < 0) temp_angle += 360;
-    dot->angle = temp_angle;
+    dot->y_speed = y_speed;
+    dot->vector.angle = temp_angle;
+    dot->vector.length = vector_length;
+    
     printf("X_speed: %d\n", dot->x_speed);
     printf("Y_speed: %d\n", dot->y_speed);
-    printf("Angle: %f\n", dot->angle);
     printf("************************\n");
 }
 
 Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
 
-    char new_dot=TRUE;
+    char new_dot=TRUE, turning;
 
     int i,
         pos_x,pos_y, 
-        dot_x,dot_y,
-        matchedIndex, check_distance;
+        dot_x,dot_y, predicted_dot_x, predicted_dot_y,
+        matchedIndex, matching_radius;
         
-    double distance=9999,
-        predicted_distance, normal_distance, compare_distance,
-        x_dist, y_dist,
-        angle_margin=45, vector_lenght;
-    double vector_angle,point_angle;
+    double min_distance=9999,
+        distance_to_point,
+        x_dist, y_dist;
+    double vector_angle,point_angle,vector_length,
+           angle_matching_margin=90, angle_turning_margin=40, fast_threshold=30;
 
     pos_x = positionPointer->x;  
     pos_y = positionPointer->y;
@@ -241,60 +256,78 @@ Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
     //printf("Matching, x=%d, y=%d\n", x, y);
     
     //Check if point matches any dot
-    for(i=0; i<MAX_DOTS; i++){
+    for(i=0; i<DD_MAX_DOTS; i++){
         //For each dot
         if(dotList[i].keep && !dotList[i].matched){ //Check .matched so we only match maximum one point per dot
-        
+            
+            //Set turning to true
+            turning = TRUE;
             //Get position of current dot
             dot_x = dotList[i].x;
             dot_y = dotList[i].y;
             
-            //Get angle between the position and current dot
-            point_angle = atan2(pos_x-dot_x , pos_y-dot_y)*180 / PI;
-            if(point_angle < 0) temp_angle += 360;
+            printf("Checking dot X: %d, Y: %d\n", dot_x, dot_y);
             
-            printf("Checking dot X: %d, Y: %d\n", dotList[i].x, dotList[i].y);
-            
-            //Get distance from predicted dot to position
-            x_dist = pow( (pos_x-dotList[i].x-(dotList[i].x_speed)*2), 2);
-            y_dist = pow( (pos_y-dotList[i].y-(dotList[i].y_speed)*2), 2);
-            predicted_distance = sqrt( abs(x_dist+y_dist) );
-            printf("Predicted Distance: %f\n", predicted_distance);
-            
-            //Get distance from actual dot to position
-            x_dist = pow( (pos_x-dotList[i].x ), 2 );
-            y_dist = pow( (pos_y-dotList[i].y ), 2 );
-            normal_distance = sqrt( abs(x_dist+y_dist) );
-            printf("Normal distance: %f\n", normal_distance);
-
             //Get length of dot vector
-            vector_lenght = sqrt( pow(dotList[i].x_speed, 2) + pow(dotList[i].y_speed, 2) );
+            vector_length = dotList[i].vector.length;
 
             //Get angle of dot vector
-            vector_angle = dotList[i].angle;  
+            vector_angle = dotList[i].vector.angle;  
             
-            printf("Vector lenght: %f\n", vector_lenght);
+            //Get angle between the position and current dot
+            point_angle = atan2(pos_x-dot_x , pos_y-dot_y)*180 / PI;
+            if(point_angle < 0) point_angle += 360;
+            
+            printf("Point angle: %f\n", point_angle);
+            
+            printf("Vector angle: %f\n", vector_angle);
+            
+            //Check if point is "turning"
+            if( vector_angle-(angle_turning_margin/2) < point_angle < vector_angle+(angle_turning_margin/2) ) turning = FALSE;
+            
+            //If dot is "fast" and not "turning" we predict its next position and measure the distance from there
+            if( (vector_length > fast_threshold/2) && !turning ){
+            
+                //Get distance from predicted dot to position
+                x_dist = pow( (pos_x-dotList[i].x - (dotList[i].x_speed) ), 2);
+                y_dist = pow( (pos_y-dotList[i].y - (dotList[i].y_speed) ), 2);
+                distance_to_point = sqrt( abs(x_dist+y_dist) );
+                printf("Predicted Distance: %f\n", distance_to_point);
+            } else {
+                
+                //Get distance from actual dot to position
+                x_dist = pow( (pos_x-dotList[i].x ), 2 );
+                y_dist = pow( (pos_y-dotList[i].y ), 2 );
+                distance_to_point = sqrt( abs(x_dist+y_dist) );
+                printf("Normal distance: %f\n", distance_to_point);
+            }
+            
+            printf("Vector length: %f\n", vector_length);
             
             //Check how fast dot is moving. If it moves "slow" we check a circle with radius 100 around the dot.
-            //If it moves "fast" we check a circle-arc with radius 200 and 90* angle in front of the dot.
-            if(vector_lenght < 30){ check_distance = 100; compare_distance = normal_distance; }
-            else{ check_distance = 300; compare_distance = predicted_distance; }
+            //If it moves "fast" we check a circle-arc with radius 300 and 90* angle in front of the dot.
+            if(vector_length < fast_threshold){ matching_radius = 100; }
+            else{ matching_radius = 300; /*distance_to_point = predicted_dot_distance_to_point;*/ }
             
-            printf("Angle: %f\n", temp_angle);
             
-            if( (compare_distance < check_distance ) && compare_distance<distance){   //Find the dot closest to this "position"
-                if(check_distance > 200){
-                    if( vector_angle-angle_margin< point_angle <vector_angle+angle_margin){
-                        distance=compare_distance; 
-                        matchedIndex=i; 
-                        new_dot=FALSE;
+            //Check if the distance from point to dot (or predicted dot) is within the allowed radius
+            if( (distance_to_point < matching_radius ) && distance_to_point < min_distance){   //Find the dot closest to this "position"
+            
+                //If the vector length is over the "fast" threshold we have a "fast" dot. So we check the angle as well
+                if(vector_length > fast_threshold){   
+                    if( vector_angle-(angle_matching_margin/2)< point_angle <vector_angle+(angle_matching_margin/2)){
+                    
+                        //Save the index of this dot as the matched index and update the minimum distance found
+                        min_distance = distance_to_point; 
+                        matchedIndex = i; 
+                        new_dot = FALSE;
                         printf("Angle matching!\n");
                     }
                 } else {
-                
-                    distance=compare_distance; 
-                    matchedIndex=i; 
-                    new_dot=FALSE;
+                    //Save the index of this dot as the matched index and update the minimum distance found
+                    min_distance = distance_to_point; 
+                    matchedIndex = i; 
+                    new_dot = FALSE;
                 }
             }
         }
@@ -350,10 +383,14 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
 
     for(i=0; i<MAX_BALLS; i++) ballList[i].keep=FALSE;
     for(i=0; i<DD_MAX_DOTS; i++) dotList[i].keep=FALSE;
+    
     physicsParams.momentum=TRUE;
     physicsParams.flip_gravity=FALSE;
-    physicsParams.wind=FALSE;
-
+    physicsParams.wind=TRUE;
+    physicsParams.wind_speed=5;
+    physicsParams.friction_force=1;
+    physicsParams.gravity_force=2;
+    
     while( !done ) {
 
         // Clear the image
