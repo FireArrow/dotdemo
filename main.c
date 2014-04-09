@@ -233,7 +233,7 @@ Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
 /**
  * Main loop
  */
-int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
+int run( SDL_Window* window, SDL_Renderer* renderer ) {
 
     char done = FALSE,
          show_calibrate = FALSE,
@@ -244,8 +244,8 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
          epilepsy = FALSE;
 
     int x, y,
-        i, j,
-        seqnr;
+        i, j;
+    unsigned long long seqnr;
         
     int numberOfDots=0;
     int numberOfBalls=0;
@@ -285,7 +285,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
         }
 
         // Get input from dotdetector
-        numberOfPositions = getDots( ddclientfd, &laser_point_buf[0][0], &dots_updated, &seqnr );
+        numberOfPositions = getDots( &laser_point_buf[0][0], &dots_updated, &seqnr );
         
         //Process dots
         if( dots_updated ) {
@@ -441,7 +441,6 @@ void usage( int ret, const char* err_msg ) {
 int main( int argc, char** argv ) {
     int ret = 0; // Return value of the entire program
     int i;
-    int ddclientfd; // Socket for dotdetector
     int ddlistenport = 10001; // The port to listen for incomming dots
     int displaynumber = 0; // The display to view this on
 
@@ -504,12 +503,16 @@ int main( int argc, char** argv ) {
 
     // Init the dotdetector client
     verboseOut( "Listening for dots on port %d\n", ddlistenport );
-    ddclientfd = initDDclient( "unimplemented", ddlistenport );
+    if( initDDclient( "unimplemented", ddlistenport, LATEST ) ) {
+        fprintf( stderr, "ERROR: ddclient init failed\n" );
+        ret = -1;
+        goto error;
+    }
 
     verboseOut( "Initiating SDL\n" );
     if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) {
         fprintf( stderr, "ERROR: SDL init failed. Message: %s\n", SDL_GetError() );
-        ret = -1;
+        ret = -2;
         goto error;
     }
 
@@ -569,7 +572,7 @@ int main( int argc, char** argv ) {
 
     // Start the game loop
     verboseOut( "Starting the main loop\n" );
-    ret = run( window, renderer, ddclientfd );
+    ret = run( window, renderer );
 
 error:
 
