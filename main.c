@@ -8,10 +8,15 @@
 #include <SDL2/SDL2_framerate.h>
 #include "ddclientlib/ddclient.h"
 #include "ddclientlib/ddhelpers.h"
+#include "dotdemo.h"
 
 #define verboseOut(...) if(verbose) printf( __VA_ARGS__ )
+
+#define MAX_DECAY 1
 #define TRUE 1
 #define FALSE 0
+
+#define PI 3.14159265
 
 #ifndef DD_MAX_DOTS
 #define DD_MAX_DOTS 150
@@ -23,138 +28,24 @@
 
 static int screen_w = 0;
 static int screen_h = 0;
-static int wind_speed=5;
 static int dot_size=10;
 static char verbose = 0;
 
-typedef struct Parameters{
-    char momentum;
-    char wind;
-    char flip_gravity;
-} Parameters;
-
-typedef struct Position {
-    int x;
-    int y;
-    char matched;
-} Position;
-
-typedef struct Dot {
-    int x;
-    int y;
-    int x_speed;
-    int y_speed;
-    char keep;
-    char matched;
-} Dot;
-
-typedef struct Ball {
-    int x;
-    int y;
-    int y_speed;
-    int x_speed;
-    int r,b,g;
-    char keep;
-} Ball;
 
 void pruneDots(Dot* dotList){
 
     int i;
     for(i=0; i<DD_MAX_DOTS; i++){
         dotList[i].keep = FALSE;
-        if(dotList[i].matched == TRUE) dotList[i].keep = TRUE;
+        if(dotList[i].matched == TRUE){ 
+            dotList[i].keep = TRUE; 
+            dotList[i].decay = MAX_DECAY; 
+        } else if (dotList[i].decay > 0) {
+            dotList[i].keep = TRUE;
+            dotList[i].decay -= 1;
+        }
         dotList[i].matched = FALSE;
     }
-
-}
-
-int spawnBall(Dot* dot, Ball* ballList){
-
-    int i,j,x,y;
-
-    for(i=0; i<MAX_BALLS; i++){
-    
-        if(!ballList[i].keep){
-        
-            ballList[i].x = dot->x;
-            ballList[i].y = dot->y;
-            ballList[i].keep = TRUE;
-            ballList[i].r = rand() % 0xFF;
-            ballList[i].b = rand() % 0xFF;
-            ballList[i].g = rand() % 0xFF;
-            ballList[i].x_speed = dot->x_speed;
-            ballList[i].y_speed = dot->y_speed;
-            break;
-        }
-    
-    }
-}
-
-Dot* addDot(Dot* dotList, Position* positionPointer){
-
-    int i,j;
-    
-    for(i=0; i<DD_MAX_DOTS; i++){
-    
-        if(!dotList[i].keep){
-        
-            dotList[i].x = (int) positionPointer->x;
-            dotList[i].y = (int) positionPointer->y;
-            dotList[i].matched=TRUE;
-            dotList[i].keep=TRUE;
-            dotList[i].x_speed=0;
-            dotList[i].y_speed=0;
-            return (Dot*) &dotList[i];
-        }
-    }
-}
-
-
-Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
-
-    char new_dot=TRUE;
-
-    int i,
-        x,y,
-        distance=9999,
-        temp_dist,matchedIndex,
-        x_dist, y_dist,
-        x_speed, y_speed;
-
-    x = positionPointer->x;  
-    y = positionPointer->y;
-    
-    //printf("Matching, x=%d, y=%d\n", x, y);
-    
-    //Check if point matches any dot
-    for(i=0; i<DD_MAX_DOTS; i++){
-        
-        if(dotList[i].keep && !dotList[i].matched){ //Check .matched so we only match maximum one point per dot
-            
-            x_dist = (x-dotList[i].x)^2;
-            y_dist = (y-dotList[i].y)^2;
-        
-            temp_dist = sqrt( abs(x_dist+y_dist) );
-            
-            if(temp_dist < 15 && temp_dist<distance){ 
-            
-                distance=temp_dist; 
-                matchedIndex=i; 
-                new_dot=FALSE;
-            }
-        }
-    }
-    
-    //Return pointer to the matched dot if we found one
-    if(!new_dot){
-    
-        dotList[matchedIndex].matched=TRUE;
-        return &dotList[matchedIndex];
-    } 
-    
-    //Falling through here means make new dot!
-    return ( addDot(&dotList[0], positionPointer));
-    
 }
 
 
@@ -171,7 +62,7 @@ void applyForces(Ball* ballList, Parameters physicsParams){
             if(0>(x-(dot_size/2)) || (x+dot_size/2)>screen_w) ballList[i].x_speed = -ballList[i].x_speed; 
 
             //Apply linear force on all balls
-            if(physicsParams.wind){ ballList[i].x = ballList[i].x + wind_speed;}    
+            if(physicsParams.wind){ ballList[i].x += physicsParams.wind_speed;}    
                       
             //Apply individual momentum
             if(physicsParams.momentum){ 
@@ -180,12 +71,12 @@ void applyForces(Ball* ballList, Parameters physicsParams){
             }
 
             //Apply gravity
-            if(physicsParams.flip_gravity) ballList[i].y_speed -= 2;
-            else ballList[i].y_speed += 2;
+            if(physicsParams.flip_gravity) ballList[i].y_speed -= physicsParams.gravity_force;
+            else ballList[i].y_speed += physicsParams.gravity_force;
             
             //Apply friction
-            if(ballList[i].x_speed > 0) ballList[i].x_speed -= 1;
-            if(ballList[i].x_speed < 0) ballList[i].x_speed += 1;      
+            if(ballList[i].x_speed > 0) ballList[i].x_speed -= physicsParams.friction_force;
+            if(ballList[i].x_speed < 0) ballList[i].x_speed += physicsParams.friction_force;      
                       
             //Check if ball has fallen from screen
             if(ballList[i].y > screen_h || ballList[i].y < 0){ ballList[i].keep=FALSE;}
@@ -194,44 +85,149 @@ void applyForces(Ball* ballList, Parameters physicsParams){
 }
 
 
-void drawBall(Ball* ball, SDL_Renderer* renderer){
-
-                 filledCircleRGBA( renderer, ball->x, ball->y, dot_size,
-                                ball->r % 0xFF,          // R
-                                ball->g % 0xFF,          // G
-                                ball->b % 0xFF,          // B
-                                0xFF                    // A
-                        );
-}
-
-
-void drawDot(Dot* dot, SDL_Renderer* renderer){
-
-                 filledCircleRGBA( renderer, dot->x, dot->y, dot_size,
-                                rand() % 0xFF,          // R
-                                rand() % 0xFF,          // G
-                                rand() % 0xFF,          // B
-                                0xFF                    // A
-                        );
-}
-
-
-
 void updateVector(Dot* dot, Position* positionPointer){
 
     int x_speed, y_speed,
         dot_x=dot->x, dot_y=dot->y,
         pos_x=positionPointer->x, pos_y=positionPointer->y;
-        
+    double f1,f2,temp_angle, vector_length;    
+    
     //Calculate new speed
-    x_speed = (pos_x - dot_x)/2;
-    y_speed = (pos_y - dot_y)/2;    
+    x_speed = (pos_x - dot_x);
+    y_speed = (pos_y - dot_y);    
+
+    //Some floats for atan
+    f1 = (x_speed);
+    f2 = (y_speed);
+    
+    //Calculate vector angle
+    temp_angle = atan2( f1,f2 )*180 / PI;
+    if(temp_angle < 0) temp_angle += 360;
+
+    //Calculate vector length
+    vector_length = sqrt( pow(x_speed, 2) + pow(y_speed, 2) );
 
     //Update dot parameters
     dot->x = pos_x;
     dot->y = pos_y;
     dot->x_speed = x_speed;
-    dot->y_speed = y_speed; 
+    dot->y_speed = y_speed;
+    dot->vector.angle = temp_angle;
+    dot->vector.length = vector_length;
+    
+    verboseOut("X_speed: %d\n", dot->x_speed);
+    verboseOut("Y_speed: %d\n", dot->y_speed);
+    verboseOut("************************\n");
+}
+
+Dot* matchPosition(Dot* dotList, struct Position* positionPointer){
+
+    char new_dot=TRUE, turning;
+
+    int i,
+        pos_x,pos_y, 
+        dot_x,dot_y, predicted_dot_x, predicted_dot_y,
+        matchedIndex, matching_radius;
+        
+    double min_distance=9999,
+        distance_to_point,
+        x_dist, y_dist;
+    double vector_angle,point_angle,vector_length,
+           angle_matching_margin=90, angle_turning_margin=40, fast_threshold=30;
+
+    pos_x = positionPointer->x;  
+    pos_y = positionPointer->y;
+    
+    //verboseOut("Matching, x=%d, y=%d\n", x, y);
+    
+    //Check if point matches any dot
+    for(i=0; i<DD_MAX_DOTS; i++){
+        //For each dot
+        if(dotList[i].keep && !dotList[i].matched){ //Check .matched so we only match maximum one point per dot
+            //Set turning to true
+            turning = TRUE;
+            
+            //Get position of current dot
+            dot_x = dotList[i].x;
+            dot_y = dotList[i].y;
+            
+            verboseOut("Checking dot X: %d, Y: %d\n", dot_x, dot_y);
+            
+            //Get length of dot vector
+            vector_length = dotList[i].vector.length;
+
+            //Get angle of dot vector
+            vector_angle = dotList[i].vector.angle;  
+            
+            //Get angle between the position and current dot
+            point_angle = atan2(pos_x-dot_x , pos_y-dot_y)*180 / PI;
+            if(point_angle < 0) point_angle += 360;
+            
+            verboseOut("Point angle: %f\n", point_angle);
+            
+            verboseOut("Vector angle: %f\n", vector_angle);
+            
+            //Check if point is "turning"
+            if( vector_angle-(angle_turning_margin/2) < point_angle < vector_angle+(angle_turning_margin/2) ) turning = FALSE;
+            
+            //If dot is "fast" and not "turning" we predict its next position and measure the distance from there
+            if( (vector_length > fast_threshold) && !turning ){
+            
+                //Get distance from predicted dot to position
+                x_dist = pow( (pos_x-dotList[i].x - (dotList[i].x_speed) ), 2);
+                y_dist = pow( (pos_y-dotList[i].y - (dotList[i].y_speed) ), 2);
+                distance_to_point = sqrt( abs(x_dist+y_dist) );
+                verboseOut("Predicted Distance: %f\n", distance_to_point);
+            } else {
+                
+                //Get distance from actual dot to position
+                x_dist = pow( (pos_x-dotList[i].x ), 2 );
+                y_dist = pow( (pos_y-dotList[i].y ), 2 );
+                distance_to_point = sqrt( abs(x_dist+y_dist) );
+                verboseOut("Normal distance: %f\n", distance_to_point);
+            }
+            
+            verboseOut("Vector length: %f\n", vector_length);
+            
+            //Check how fast dot is moving. If it moves "slow" we check a circle with radius 100 around the dot.
+            //If it moves "fast" we check a circle-arc with radius 300 and 90* angle in front of the dot.
+            if(vector_length < fast_threshold) matching_radius = 100; 
+            else matching_radius = 300;  
+            
+            
+            //Check if the distance from point to dot (or predicted dot) is within the allowed radius
+            if( (distance_to_point < matching_radius ) && (distance_to_point < min_distance) ){   //Find the dot closest to this "position"
+            
+                //If the vector length is over the "fast" threshold we have a "fast" dot. So we check the angle as well
+                if(vector_length > fast_threshold){   
+                    if( vector_angle-(angle_matching_margin/2)< point_angle <vector_angle+(angle_matching_margin/2)){
+                    
+                        //Save the index of this dot as the matched index and update the minimum distance found
+                        min_distance = distance_to_point; 
+                        matchedIndex = i; 
+                        new_dot = FALSE;
+                        verboseOut("Angle matching!\n");
+                    }
+                } else {
+                    //Save the index of this dot as the matched index and update the minimum distance found
+                    min_distance = distance_to_point; 
+                    matchedIndex = i; 
+                    new_dot = FALSE;
+                }
+            }
+        }
+    }
+    
+    //Return pointer to the matched dot if we found one
+    if(!new_dot){
+    
+        dotList[matchedIndex].matched=TRUE;
+        return &dotList[matchedIndex];
+    } 
+    
+    //Falling through here means make new dot!
+    return ( addDot(&dotList[0], positionPointer));
+    
 }
 
 /**
@@ -242,8 +238,9 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
     char done = FALSE,
          show_calibrate = FALSE,
          dots_updated = FALSE,
-         makeItRain=TRUE,
+         makeItRain = FALSE,
          draw_mode = FALSE,
+         draw_vector = FALSE,
          epilepsy = FALSE;
 
     int x, y,
@@ -271,11 +268,15 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
 
     for(i=0; i<MAX_BALLS; i++) ballList[i].keep=FALSE;
     for(i=0; i<DD_MAX_DOTS; i++) dotList[i].keep=FALSE;
+    
     physicsParams.momentum=TRUE;
     physicsParams.flip_gravity=FALSE;
-    physicsParams.wind=FALSE;
-
-    while( !done ) {
+    physicsParams.wind=TRUE;
+    physicsParams.wind_speed=5;
+    physicsParams.friction_force=1;
+    physicsParams.gravity_force=2;
+    
+    while( !done ) {    //Main loop
 
         // Clear the image
         if( !draw_mode ) {
@@ -304,22 +305,32 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
             
             //Match positions to dots, and spawn balls on all matched dots (including new dots)
             for(i=0; i<numberOfPositions; i++) {
-                
+
+                //Informative printout
                 verboseOut("Found dot x: %d, y: %d\n", (int)positionList[i].x, (int)positionList[i].y);
                 
+                //Return reference to matched dot, or reference to new dot if no match was found. This is where the magic happens
                 matchedDot =  matchPosition(&dotList[0], &positionList[i]);   
                 
-                if(matchedDot->matched) updateVector(matchedDot, &positionList[i]);
+                verboseOut("Matched with dot x: %d, y: %d\n", matchedDot->x, matchedDot->y);
                 
+                //If the position was matched to an existing dot we update the vector for that dot
+                if(matchedDot->matched) updateVector(matchedDot, &positionList[i]); 
+                
+                //Draw the vector if enabled
+                if(draw_vector) drawVector(matchedDot, renderer); 
+                
+                //Spawn a ball on the dot. The ball will be created with the same vector as the dot
                 spawnBall(matchedDot, &ballList[0]);
                 
+                //We set the dot as matched even if it was created this frame. This is to keep it form beeing decayed later
                 matchedDot->matched = TRUE;
-                positionList[i].matched=TRUE;
+                positionList[i].matched = TRUE;
 
             }
         }
 
-        //Remove all dots without match
+        //Decay all dots without match. Dots created this frame will NOT be decayed.
         pruneDots(&dotList[0]);
         
         //Apply highly advanced physics model to balls
@@ -328,13 +339,13 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
         //Draw dots
 
         for(i=0; i<DD_MAX_DOTS; i++){
-            if(dotList[i].keep) drawDot( &dotList[i], renderer);
+            if(dotList[i].keep) drawDot( &dotList[i], renderer, dot_size);
         }
     
         //Draw balls
         if(makeItRain){
             for(i=0; i<MAX_BALLS; i++){
-                if(ballList[i].keep) drawBall( &ballList[i], renderer);
+                if(ballList[i].keep) drawBall( &ballList[i], renderer, dot_size);
             }
         }
         
@@ -373,6 +384,9 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
                         case SDLK_e:
                             epilepsy = !epilepsy;
                             break;    
+                        case SDLK_v:
+                            draw_vector = !draw_vector;
+                            break;
                         case SDLK_1:
                             dot_size = 10;
                             break;    
@@ -399,7 +413,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer, int ddclientfd ) {
         SDL_RenderPresent( renderer );
         SDL_framerateDelay( &fps );
 
-    }
+    } //End of main loop
 
     return 0;
 }
@@ -415,10 +429,10 @@ char* usage_message[] = {
 void usage( int ret, const char* err_msg ) {
     int i;
     char** line = &usage_message[0];
-    printf( "%s\n", err_msg );
+    verboseOut( "%s\n", err_msg );
 
     for( i=0; line[i] != NULL; ++i ) {
-        printf( "%s\n", line[i] );
+        verboseOut( "%s\n", line[i] );
     }
 
     exit( ret );
