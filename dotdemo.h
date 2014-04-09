@@ -4,11 +4,36 @@
 
 #include <SDL2/SDL.h>
 
+typedef struct Dot Dot;
+typedef struct Position Position;
+
+
 typedef struct Vector {
 
     double length;
     double angle;
 } Vector;
+
+struct Position {
+    int x;
+    int y;
+    char matched;
+    Dot* matched_dot;
+};
+
+struct Dot {
+    int x;
+    int y;
+    int x_speed;
+    int y_speed;
+    int r,b,g;
+    int decay;
+    double matched_distance;
+    char keep;
+    char matched;
+    Vector vector;
+    Position* matched_point;
+};
 
 typedef struct Parameters{
     char wind;
@@ -18,24 +43,6 @@ typedef struct Parameters{
     int gravity_force;
     int friction_force;
 } Parameters;
-
-typedef struct Position {
-    int x;
-    int y;
-    char matched;
-} Position;
-
-typedef struct Dot {
-    int x;
-    int y;
-    int x_speed;
-    int y_speed;
-    int r,b,g;
-    int decay;
-    Vector vector;
-    char keep;
-    char matched;
-} Dot;
 
 typedef struct Ball {
     int x;

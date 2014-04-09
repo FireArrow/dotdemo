@@ -38,7 +38,7 @@ void drawVector(Dot* dot, SDL_Renderer* r){
 
 SDL_SetRenderDrawColor(r,255,255,255,255);
 
-    SDL_RenderDrawLine(r, dot->x, dot->y, (dot->x+5*dot->x_speed), (dot->y+5*dot->y_speed) );
+    SDL_RenderDrawLine(r, dot->x, dot->y, (dot->x+dot->x_speed), (dot->y+dot->y_speed) );
 
 }
 
@@ -81,6 +81,9 @@ Dot* addDot(Dot* dotList, Position* positionPointer){
             dotList[i].x_speed=0;
             dotList[i].y_speed=0;
             dotList[i].decay = MAX_DECAY;
+            dotList[i].vector.length=0;
+            dotList[i].vector.angle=0;
+            dotList[i].matched_distance=9999;
             
             dotList[i].r = rand() % 0xFF;
             dotList[i].b = rand() % 0xFF;
