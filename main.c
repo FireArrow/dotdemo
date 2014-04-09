@@ -10,7 +10,7 @@
 #include "ddclientlib/ddhelpers.h"
 #include "dotdemo.h"
 
-#define verboseOut(...) if( verbose) printf( __VA_ARGS__ )
+#define verboseOut(...) if( verbose ) printf( __VA_ARGS__ )
 
 #define MAX_DECAY 2
 #define TRUE 1
@@ -32,7 +32,7 @@ static int dot_size=10;
 static char verbose = 0;
 
 
-void pruneDots( Dot* dotList) {
+void pruneDots( Dot* dotList ) {
 
     //Decay all dots that were not matched this frame.
     //Reset decay for all matched dots 
@@ -40,14 +40,14 @@ void pruneDots( Dot* dotList) {
 
     int i;
     for( i=0; i<DD_MAX_DOTS; i++) {
-        if( dotList[i].keep) {
+        if( dotList[i].keep ) {
         
             dotList[i].keep = FALSE;
-            if( dotList[i].matched == TRUE) { 
+            if( dotList[i].matched == TRUE ) { 
             
                 dotList[i].keep = TRUE; 
                 dotList[i].decay = MAX_DECAY; 
-            } else if ( dotList[i].decay > 1) {
+            } else if ( dotList[i].decay > 1 ) {
             
                 dotList[i].keep = TRUE;
                 dotList[i].decay -= 1;
@@ -58,43 +58,43 @@ void pruneDots( Dot* dotList) {
 }
 
 
-void applyForces( Ball* ballList, Parameters physicsParams) {
+void applyForces( Ball* ballList, Parameters physicsParams ) {
 
     int i,x;
 
     for( i=0; i<MAX_BALLS; ++i ) {
-        if( ballList[i].keep) {
+        if( ballList[i].keep ) {
 
             x = ballList[i].x;
 
             //Collision detection with edge of screen
-            if( 0>( x-( dot_size/2)) || ( x+dot_size/2)>screen_w) ballList[i].x_speed = -ballList[i].x_speed; 
+            if( 0>( x-( dot_size/2 )) || ( x+dot_size/2 )>screen_w ) ballList[i].x_speed = -ballList[i].x_speed; 
 
             //Apply linear force on all balls
-            if( physicsParams.wind) { ballList[i].x += physicsParams.wind_speed;}    
+            if( physicsParams.wind ) { ballList[i].x += physicsParams.wind_speed;}    
                       
             //Apply individual momentum
-            if( physicsParams.momentum) { 
+            if( physicsParams.momentum ) { 
                 ballList[i].x += ballList[i].x_speed; 
                 ballList[i].y += ballList[i].y_speed;
             }
 
             //Apply gravity
-            if( physicsParams.flip_gravity) ballList[i].y_speed -= physicsParams.gravity_force;
+            if( physicsParams.flip_gravity ) ballList[i].y_speed -= physicsParams.gravity_force;
             else ballList[i].y_speed += physicsParams.gravity_force;
             
             //Apply friction
-            if( ballList[i].x_speed > 0) ballList[i].x_speed -= physicsParams.friction_force;
-            if( ballList[i].x_speed < 0) ballList[i].x_speed += physicsParams.friction_force;      
+            if( ballList[i].x_speed > 0 ) ballList[i].x_speed -= physicsParams.friction_force;
+            if( ballList[i].x_speed < 0 ) ballList[i].x_speed += physicsParams.friction_force;      
                       
             //Check if ball has fallen from screen
-            if( ballList[i].y > screen_h || ballList[i].y < 0) { ballList[i].keep=FALSE;}
+            if( ballList[i].y > screen_h || ballList[i].y < 0 ) { ballList[i].keep=FALSE;}
         }
     }
 }
 
 
-void updateVector( Dot* dot) {
+void updateVector( Dot* dot ) {
 
     int x_speed, y_speed,
         dot_x=dot->x, dot_y=dot->y,
@@ -102,19 +102,19 @@ void updateVector( Dot* dot) {
     double f1,f2,temp_angle, vector_length;    
     
     //Calculate new speed
-    x_speed = ( pos_x - dot_x);
-    y_speed = ( pos_y - dot_y);    
+    x_speed = ( pos_x - dot_x );
+    y_speed = ( pos_y - dot_y );    
 
     //Some floats for atan
-    f1 = ( x_speed);
-    f2 = ( y_speed);
+    f1 = ( x_speed );
+    f2 = ( y_speed );
     
     //Calculate vector angle
     temp_angle = atan2( f1,f2 )*180 / PI;
-    if( temp_angle < 0) temp_angle += 360;
+    if( temp_angle < 0 ) temp_angle += 360;
 
     //Calculate vector length
-    vector_length = sqrt( pow( x_speed, 2) + pow( y_speed, 2) );
+    vector_length = sqrt( pow( x_speed, 2 ) + pow( y_speed, 2 ) );
 
     //Update dot parameters
     dot->x = pos_x;
@@ -124,12 +124,12 @@ void updateVector( Dot* dot) {
     dot->vector.angle = temp_angle;
     dot->vector.length = vector_length;
     
-    verboseOut("X_speed: %d\n", dot->x_speed);
-    verboseOut("Y_speed: %d\n", dot->y_speed);
+    verboseOut("X_speed: %d\n", dot->x_speed );
+    verboseOut("Y_speed: %d\n", dot->y_speed );
     verboseOut("************************\n");
 }
 
-char matchPosition( Dot* dotList, struct Position* positionPointer) {
+char matchPosition( Dot* dotList, struct Position* positionPointer ) {
 
     char match_was_found=FALSE, turning, geometry_check, matching_check, dot_was_stolen=FALSE;
 
@@ -149,7 +149,7 @@ char matchPosition( Dot* dotList, struct Position* positionPointer) {
     pos_x = positionPointer->x;  
     pos_y = positionPointer->y;
     
-    verboseOut("Checking position x: %d, y: %d\n", pos_x, pos_y);
+    verboseOut("Checking position x: %d, y: %d\n", pos_x, pos_y );
     
     //Check if point matches any dot
     for( i=0; i<DD_MAX_DOTS; i++) {
@@ -158,7 +158,7 @@ char matchPosition( Dot* dotList, struct Position* positionPointer) {
         geometry_check = FALSE;
         matching_check = FALSE;
         
-        if( dotList[i].keep) { //Check all dots
+        if( dotList[i].keep ) { //Check all dots
         
             current_dot = &dotList[i];
             
@@ -169,7 +169,7 @@ char matchPosition( Dot* dotList, struct Position* positionPointer) {
             dot_x = current_dot->x;
             dot_y = current_dot->y;
             
-            verboseOut("Checking dot X: %d, Y: %d\n", dot_x, dot_y);
+            verboseOut("Checking dot X: %d, Y: %d\n", dot_x, dot_y );
             
             //Get length of dot vector
             vector_length = current_dot->vector.length;
@@ -178,50 +178,50 @@ char matchPosition( Dot* dotList, struct Position* positionPointer) {
             vector_angle = current_dot->vector.angle;  
             
             //Get angle between the position and current dot
-            point_angle = atan2( pos_x-dot_x , pos_y-dot_y)*180 / PI;
-            if( point_angle < 0) point_angle += 360;
+            point_angle = atan2( pos_x-dot_x , pos_y-dot_y )*180 / PI;
+            if( point_angle < 0 ) point_angle += 360;
             
-            verboseOut("Point angle: %f\n", point_angle);
+            verboseOut("Point angle: %f\n", point_angle );
             
-            verboseOut("Vector angle: %f\n", vector_angle);
+            verboseOut("Vector angle: %f\n", vector_angle );
             
             //Check if point is "turning"
-            if( vector_angle-( angle_turning_margin/2) < point_angle < vector_angle+( angle_turning_margin/2) ) turning = FALSE;
+            if( vector_angle-( angle_turning_margin/2 ) < point_angle < vector_angle+( angle_turning_margin/2 ) ) turning = FALSE;
             
             //If dot is "fast" and not "turning" we predict its next position and measure the distance from there
-            if( ( vector_length > fast_threshold) && !turning ) {
+            if( ( vector_length > fast_threshold ) && !turning ) {
             
                 //Get distance from predicted dot to position
-                x_dist = pow( ( pos_x-dot_x - current_dot->x_speed ), 2);
-                y_dist = pow( ( pos_y-dot_y - current_dot->y_speed ), 2);
-                distance_to_point = sqrt( abs( x_dist+y_dist) );
-                verboseOut("Predicted Distance: %f\n", distance_to_point);
+                x_dist = pow( ( pos_x-dot_x - current_dot->x_speed ), 2 );
+                y_dist = pow( ( pos_y-dot_y - current_dot->y_speed ), 2 );
+                distance_to_point = sqrt( abs( x_dist+y_dist ) );
+                verboseOut("Predicted Distance: %f\n", distance_to_point );
             } else {
                 
                 //Get distance from actual dot to position
                 x_dist = pow( ( pos_x-dot_x ), 2 );
                 y_dist = pow( ( pos_y-dot_y ), 2 );
-                distance_to_point = sqrt( abs( x_dist+y_dist) );
-                verboseOut("Normal distance: %f\n", distance_to_point);
+                distance_to_point = sqrt( abs( x_dist+y_dist ) );
+                verboseOut("Normal distance: %f\n", distance_to_point );
             }
             
-            verboseOut("Vector length: %f\n", vector_length);
+            verboseOut("Vector length: %f\n", vector_length );
             
             //Check how fast dot is moving. If it moves "slow" we check a circle with radius 100 around the dot.
             //If it moves "fast" we check a circle-arc with radius 300 and 90* angle in front of the dot.
-            if( vector_length < fast_threshold) matching_radius = 100; 
+            if( vector_length < fast_threshold ) matching_radius = 100; 
             else matching_radius = 300;  
 
             //****************  Geometry check  **********************
-            //Check if the distance from point to dot ( or predicted dot) is within the allowed radius
+            //Check if the distance from point to dot ( or predicted dot ) is within the allowed radius
             //Also check if this point is closer than the closest matched point so far
-            if( ( distance_to_point < matching_radius ) && ( distance_to_point < min_distance) ) { 
+            if( ( distance_to_point < matching_radius ) && ( distance_to_point < min_distance ) ) { 
                 geometry_check = TRUE;    
             }
             
             //If the dot is "fast" we need to make an angle check
-            if( geometry_check && ( vector_length > fast_threshold) ) {   
-                if( vector_angle-( angle_matching_margin/2)< point_angle <vector_angle+( angle_matching_margin/2)) {
+            if( geometry_check && ( vector_length > fast_threshold ) ) {   
+                if( vector_angle-( angle_matching_margin/2 )< point_angle <vector_angle+( angle_matching_margin/2 )) {
                     //Geometry check is go!
                     geometry_check = TRUE;
                     verboseOut("Angle matching!\n");
@@ -231,13 +231,13 @@ char matchPosition( Dot* dotList, struct Position* positionPointer) {
                 }
             }
 
-            if( geometry_check) matched_dot = current_dot;
+            if( geometry_check ) matched_dot = current_dot;
 
             //****************  Matching check  **********************
             //Check if we are allowed to steal this dot from its previous point
-            if( geometry_check && (!current_dot->matched) && (!positionPointer->matched) ) matching_check = TRUE;
+            if( geometry_check && (!current_dot->matched ) && (!positionPointer->matched ) ) matching_check = TRUE;
             
-            if( geometry_check && ( current_dot->matched) ) {
+            if( geometry_check && ( current_dot->matched ) ) {
                 if( distance_to_point < matched_dot->matched_distance ) {
                     verboseOut( "    Distance_to_point: %f\n", distance_to_point );
                     verboseOut( "    Matched distance: %f\n", matched_dot->matched_distance );
@@ -248,7 +248,7 @@ char matchPosition( Dot* dotList, struct Position* positionPointer) {
             }
 
             //If both checks are true we want to match this dot and point, and we are allowed to
-            if( geometry_check && matching_check) {
+            if( geometry_check && matching_check ) {
                 match_was_found = TRUE;
                 matched_dot=current_dot; 
                 min_distance = distance_to_point;                
@@ -260,14 +260,14 @@ char matchPosition( Dot* dotList, struct Position* positionPointer) {
 
 
     //Return pointer to the matched dot if we found one
-    if( match_was_found) {
+    if( match_was_found ) {
 
-        if( matched_dot->matched) {
+        if( matched_dot->matched ) {
             //Match ALL the things!
             matched_dot->matched_point->matched = FALSE;
-            verboseOut("Previously matched dot x: %d, y: %d\n", matched_dot->matched_point->x, matched_dot->matched_point->y); 
+            verboseOut("Previously matched dot x: %d, y: %d\n", matched_dot->matched_point->x, matched_dot->matched_point->y ); 
             dot_was_stolen = TRUE;
-            verboseOut("Stole dot x: %d, y: %d\n", matched_dot->x, matched_dot->y);
+            verboseOut("Stole dot x: %d, y: %d\n", matched_dot->x, matched_dot->y );
             verboseOut("-------------------------\n");
         }
         
@@ -340,10 +340,10 @@ int run( SDL_Window* window, SDL_Renderer* renderer ) {
 
         // Get input from dotdetector
         dots_updated = FALSE;
-        numberOfPositions = getDots( ddclientfd, &laser_point_buf[0][0], &dots_updated, &seqnr );
+        numberOfPositions = getDots( &laser_point_buf[0][0], &dots_updated, &seqnr );
         
         //Process dots
-        if( dots_updated && numberOfPositions > 0) {
+        if( dots_updated && numberOfPositions > 0 ) {
             //We would like to have point matching please
             matching_recheck = TRUE;
             
@@ -353,7 +353,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer ) {
             
             //Fill positionList
             j=0;
-            for( i=0; i<numberOfPositions*2; i += 2) {
+            for( i=0; i<numberOfPositions*2; i += 2 ) {
             
                 positionList[j].x = positionPointer[i];
                 positionList[j].y = positionPointer[i+1];
@@ -363,23 +363,23 @@ int run( SDL_Window* window, SDL_Renderer* renderer ) {
             }
 
             //Do crazy matching thing
-            while( matching_recheck) {
+            while( matching_recheck ) {
 
                 for( i=0; i<numberOfPositions; i++) {
                     point_pointer = &positionList[i];
-                    if(!point_pointer->matched) matching_recheck = matchPosition(&dotList[0], point_pointer);
+                    if(!point_pointer->matched ) matching_recheck = matchPosition(&dotList[0], point_pointer );
                 }
             }
 
-            //Update vector for all matched dots, spawn balls on them, and draw the dots ( not the balls)
+            //Update vector for all matched dots, spawn balls on them, and draw the dots ( not the balls )
             for( i=0; i<DD_MAX_DOTS; i++) {
             
-                dot_pointer=&dotList[i];
-                if( dot_pointer->matched) { 
-                    updateVector( dot_pointer); 
+                dot_pointer = &dotList[i];
+                if( dot_pointer->matched ) { 
+                    updateVector( dot_pointer ); 
                     spawnBall( dot_pointer, &ballList[0]); 
-                    drawDot( dot_pointer, renderer, dot_size);
-                    if( draw_vector) drawVector( dot_pointer, renderer);
+                    drawDot( dot_pointer, renderer, dot_size );
+                    if( draw_vector ) drawVector( dot_pointer, renderer );
                 }
             }
             
@@ -387,21 +387,21 @@ int run( SDL_Window* window, SDL_Renderer* renderer ) {
             for( i=0; i<numberOfPositions; i++) {
                 
                 point_pointer = &positionList[i];
-                if(!point_pointer->matched) addDot(&dotList[0], point_pointer);
+                if(!point_pointer->matched ) addDot(&dotList[0], point_pointer );
             }
 
-        } //End of if( dots_updated)
+        } //End of if( dots_updated )
             
 
         //Draw balls if activated
-        if( makeItRain) {
+        if( makeItRain ) {
             for( i=0; i<MAX_BALLS; i++) {
-                if( ballList[i].keep) drawBall( &ballList[i], renderer, dot_size);
+                if( ballList[i].keep ) drawBall( &ballList[i], renderer, dot_size );
             }
         }
         
         //Apply highly advanced physics model to balls
-        applyForces(&ballList[0], physicsParams);
+        applyForces(&ballList[0], physicsParams );
         
         //Decay all unmatched dots. Dots spawned this frame count as matched
         pruneDots(&dotList[0]);
@@ -544,7 +544,7 @@ int main( int argc, char** argv ) {
             }
         }
 
-        // What resloution should we use? ( overrides -d)
+        // What resloution should we use? ( overrides -d )
         else if( strcmp( argv[i], "-r" ) == 0 || strcmp( argv[i], "--resolution" ) == 0 ) {
             i += 1;
             if( argv[i] != NULL ) {
