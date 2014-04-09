@@ -231,14 +231,14 @@ char matchPosition( Dot* dotList, struct Position* positionPointer ) {
                 }
             }
 
-            if( geometry_check ) matched_dot = current_dot;
+           // if( geometry_check ) matched_dot = current_dot;
 
             //****************  Matching check  **********************
             //Check if we are allowed to steal this dot from its previous point
-            if( geometry_check && (!current_dot->matched ) && (!positionPointer->matched ) ) matching_check = TRUE;
+            if( geometry_check && !(current_dot->matched ) ) matching_check = TRUE;
             
             if( geometry_check && ( current_dot->matched ) ) {
-                if( distance_to_point < matched_dot->matched_distance ) {
+                if( distance_to_point < current_dot->matched_distance ) {
                     verboseOut( "    Distance_to_point: %f\n", distance_to_point );
                     verboseOut( "    Matched distance: %f\n", matched_dot->matched_distance );
                     matching_check = TRUE;
@@ -302,6 +302,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer ) {
     int numberOfDots=0;
     int numberOfBalls=0;
     int numberOfPositions=0;
+    int numberOfLoops=0;
     float* positionPointer;
     
     Dot* matchedDot;
@@ -361,15 +362,18 @@ int run( SDL_Window* window, SDL_Renderer* renderer ) {
                 positionList[j].matched_dot = NULL;
                 ++j;
             }
-
+            numberOfLoops = 0;
             //Do crazy matching thing
-            while( matching_recheck ) {
+            while( matching_recheck && numberOfLoops < 10 ) {
 
                 for( i=0; i<numberOfPositions; i++) {
                     point_pointer = &positionList[i];
                     if(!point_pointer->matched ) matching_recheck = matchPosition(&dotList[0], point_pointer );
                 }
+                ++numberOfLoops;
             }
+
+            if(numberOfLoops >= 10) done = TRUE;
 
             //Update vector for all matched dots, spawn balls on them, and draw the dots ( not the balls )
             for( i=0; i<DD_MAX_DOTS; i++) {
