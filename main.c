@@ -239,7 +239,6 @@ char matchPosition(Dot* dotList, struct Position* positionPointer){
             
             if( geometry_check && (current_dot->matched) ){
                 if( distance_to_point < matched_dot->matched_distance ){ 
-                    verboseOut("You are here.\n");
                     verboseOut("    Distance_to_point: %f\n", distance_to_point);
                     verboseOut("    Matched distance: %f\n", matched_dot->matched_distance);
                     matching_check = TRUE;
