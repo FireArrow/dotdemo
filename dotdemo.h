@@ -28,6 +28,8 @@ struct Dot {
     int y_speed;
     int r,b,g;
     int decay;
+    double acceleration; 
+    double turning_rate;
     double matched_distance;
     char keep;
     char matched;
@@ -35,14 +37,26 @@ struct Dot {
     Position* matched_point;
 };
 
-typedef struct Parameters{
+typedef struct PhysicsParameters{
     char wind;
     char momentum;
     char flip_gravity;
     int wind_speed;
     int gravity_force;
     int friction_force;
-} Parameters;
+} PhysicsParameters;
+
+typedef struct InputParameters{
+
+    int dot_size;
+    char done;
+    char leftovers;
+    char show_calibrate;
+    char draw_mode;
+    char make_it_rain;
+    char draw_vector;
+    char draw_matching_area;
+} InputParameters;
 
 typedef struct Ball {
     int x;

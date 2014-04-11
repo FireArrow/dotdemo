@@ -1,5 +1,6 @@
 #include "dotdemo.h"
 #include <SDL2/SDL.h>
+#include <SDL2/SDL2_gfxPrimitives.h>
 
 #define TRUE 1
 #define FALSE 0
@@ -32,6 +33,16 @@ void drawDot(Dot* dot, SDL_Renderer* renderer, int dot_size){
                                 dot->b % 0xFF,          // B
                                 0xFF                    // A
                         );
+}
+
+void drawMatchingArea(Dot* dot, SDL_Renderer* renderer){
+
+    if(dot->vector.length <= 15) aacircleRGBA(renderer, dot->x, dot->y, 100, 255, 0, 0, 255); 
+    
+    if(dot->vector.length > 15) pieRGBA(renderer, dot->x, dot->y, 1.5*(dot->vector.length)+30, (-dot->vector.angle+90)-90, (-dot->vector.angle+90)+90, 255, 0, 0, 255);
+
+  //  pieRGBA(renderer, dot->x, dot->y,300, (-dot->vector.angle+90)-45, (-dot->vector.angle+90)+45, 255, 255, 0, 100);
+
 }
 
 void drawVector(Dot* dot, SDL_Renderer* r){
@@ -89,6 +100,73 @@ Dot* addDot(Dot* dotList, Position* positionPointer){
             dotList[i].b = rand() % 0xFF;
             dotList[i].g = rand() % 0xFF;
             return (Dot*) &dotList[i];
+        }
+    }
+}
+
+void getKeyboardInput(SDL_Event event, PhysicsParameters* physicsParams, InputParameters* inputParams){
+
+    while( SDL_PollEvent( &event ) ) {
+    switch( event.type ) {
+        case SDL_QUIT:
+            inputParams->done = 1;
+            break;
+
+        case SDL_KEYDOWN:
+            switch( event.key.keysym.sym ) {
+                case SDLK_ESCAPE:
+                    inputParams->done = 1;
+                    break;
+
+                case SDLK_c:
+                    inputParams->show_calibrate = ~inputParams->show_calibrate;
+                    break;
+
+                case SDLK_d:
+                    inputParams->draw_mode = ~inputParams->draw_mode;
+                    break;
+
+                case SDLK_r:
+                    inputParams->make_it_rain = !inputParams->make_it_rain;
+                    break;
+
+                case SDLK_w:
+                    physicsParams->wind = !physicsParams->wind;
+                    break;
+
+                case SDLK_f:
+                    physicsParams->flip_gravity = !physicsParams->flip_gravity;
+                    break;
+
+                case SDLK_m:
+                    physicsParams->momentum = !physicsParams->momentum;
+                    break;
+
+                case SDLK_v:
+                    inputParams->draw_vector = !inputParams->draw_vector;
+                    break;
+
+                case SDLK_a:
+                    inputParams->draw_matching_area = !inputParams->draw_matching_area;
+                    break;
+
+                case SDLK_l:
+                    inputParams->leftovers = !inputParams->leftovers;
+                    break;
+
+                case SDLK_1:
+                    inputParams->dot_size = 10;
+                    break;
+
+                case SDLK_2:
+                    inputParams->dot_size = 20;
+                    break;
+
+                case SDLK_3:
+                    inputParams->dot_size = 30;
+                    break;
+
+            } // End of key down
         }
     }
 }
