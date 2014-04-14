@@ -28,11 +28,12 @@ struct Dot {
     int y_speed;
     int r,b,g;
     int decay;
-    double acceleration; 
-    double turning_rate;
     double matched_distance;
+    double matched_w_distance;
     char keep;
     char matched;
+    char strong_matched;
+    char weak_matched;
     Vector vector;
     Position* matched_point;
 };

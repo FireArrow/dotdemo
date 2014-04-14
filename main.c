@@ -53,6 +53,8 @@ void pruneDots( Dot* dotList ) {
                 dotList[i].decay -= 1;
             }
             dotList[i].matched = FALSE;
+            dotList[i].weak_matched = FALSE;
+            dotList[i].strong_matched = FALSE;
         }
     }
 }
@@ -116,7 +118,7 @@ void updateVector( Dot* dot ) {
     //Calculate vector length
     vector_length = sqrt( pow( x_speed, 2 ) + pow( y_speed, 2 ) );
 
-    verboseOut("LENGHT: %f\n", vector_length);
+    verboseOut("Updated vector lenght: %f\n", vector_length);
 
     //Update dot parameters
     dot->x = pos_x;
@@ -149,6 +151,109 @@ void matchLeftovers( Dot* dotList, Position* positionPointer) {
             return;
         }
     }
+}
+
+char weakMatch( Dot* dotList, Position* positionPointer ) {
+
+    char match_was_found = FALSE, geometry_check, matching_check, dot_was_stolen=FALSE;
+
+    int i, pos_y = positionPointer->y, pos_x = positionPointer->x, dot_x, dot_y;
+    
+    double min_distance=9999,
+           distance_to_point, distance_to_predicted_point,
+           x_dist, y_dist;
+        
+    double vector_angle,point_angle,
+           angle_matching_margin=180;
+   
+    Dot* current_dot;
+    Dot* matched_dot;
+
+    for(i=0; i<DD_MAX_DOTS; i++){
+    
+        geometry_check = FALSE;
+        matching_check = FALSE;
+        current_dot = &dotList[i];
+        
+        if(current_dot->keep && !current_dot->strong_matched){
+        
+            dot_x = current_dot->x;
+            dot_y = current_dot->y;
+        
+            //Get angle between the position and current dot
+            point_angle = atan2( pos_x-dot_x , pos_y-dot_y )*180 / PI;
+            if( point_angle < 0 ) point_angle += 360;
+            
+            //Get angle of dot vector
+            vector_angle = current_dot->vector.angle;
+            
+            //If dot is "fast" and not "turning" we predict its next position and measure the distance from there
+            //Get distance from predicted dot to position
+            x_dist = pow( ( pos_x-dot_x - current_dot->x_speed ), 2 );
+            y_dist = pow( ( pos_y-dot_y - current_dot->y_speed ), 2 );
+            distance_to_predicted_point = sqrt( abs( x_dist+y_dist ) );
+            
+            //Get distance from actual dot to position
+            x_dist = pow( ( pos_x-dot_x ), 2 );
+            y_dist = pow( ( pos_y-dot_y ), 2 );
+            distance_to_point = sqrt( abs( x_dist+y_dist ) );
+
+
+            //**************** Geometry check ************************
+            if( vector_angle-( angle_matching_margin/4 )< point_angle <vector_angle+( angle_matching_margin/4 ) &&
+                distance_to_point < 300 &&
+                distance_to_predicted_point < min_distance) {
+                
+                    geometry_check = TRUE;
+                    min_distance = distance_to_predicted_point;
+            }        
+            
+            //****************  Matching check  **********************
+            //Check if we are allowed to steal this dot from its previous point
+            
+            //If current dot is not matched we dont need to steal it.
+            if( geometry_check && !(current_dot->matched ) ) matching_check = TRUE;
+            
+            //Check if the current dot is weakly matched. Also make sure it is not strongly matched.
+            //That might be redundant but it cant hurt.
+            if( geometry_check && ( current_dot->weak_matched ) && !( current_dot->strong_matched ) ) {
+                //Check if current distance is less than the previously matched distance
+                if( distance_to_predicted_point < current_dot->matched_w_distance ) {
+                
+                    matching_check = TRUE;    
+                } else {
+                    matching_check = FALSE;
+                }
+            }
+
+            //If both checks are true we want to match this dot and point, and we are allowed to
+            if( geometry_check && matching_check ) {
+                match_was_found = TRUE;
+                verboseOut("Weak match found.\n");
+                matched_dot = current_dot; 
+                min_distance = distance_to_predicted_point;                
+            }
+        }
+    }
+    
+    //Check if a matching dot was found for this point
+    if(match_was_found){
+    
+        //If this is true the dot was stolen, and we need to change some pointers
+        if( matched_dot->matched ) {
+            //Match ALL the things!
+            matched_dot->matched_point->matched = FALSE;
+            dot_was_stolen = TRUE;
+        }
+        
+        matched_dot->matched = TRUE;
+        matched_dot->weak_matched = TRUE;   //In "strong match" function strong_matched is set to true instead.
+        matched_dot->matched_point = positionPointer;
+        matched_dot->matched_w_distance = min_distance;
+        positionPointer->matched = TRUE;
+    }
+    
+    return dot_was_stolen;
 }
 
 char matchPosition( Dot* dotList, Position* positionPointer ) {
@@ -237,7 +342,7 @@ char matchPosition( Dot* dotList, Position* positionPointer ) {
             //Check how fast dot is moving. If it moves "slow" we check a circle with radius 100 around the dot.
             //If it moves "fast" we check a circle-arc with radius 300 and 90* angle in front of the dot.
             if( !dot_is_fast ) matching_radius = 100; 
-            else matching_radius = 30+(vector_length*1.5);  
+            else matching_radius = 30+(vector_length)*1.5;  
 
             //****************  Geometry check  **********************
             //Check if the distance from point to dot ( or predicted dot ) is within the allowed radius
@@ -284,22 +389,26 @@ char matchPosition( Dot* dotList, Position* positionPointer ) {
     } //End of matching loop
 
 
-    //Return pointer to the matched dot if we found one
+    //Check if a matching dot was found
     if( match_was_found ) {
 
+        //If this is true the dot was stolen, and we need to change some pointers
         if( matched_dot->matched ) {
             //Match ALL the things!
             matched_dot->matched_point->matched = FALSE;
-            verboseOut("Previously matched dot x: %d, y: %d\n", matched_dot->matched_point->x, matched_dot->matched_point->y ); 
             dot_was_stolen = TRUE;
+            
+            verboseOut("Previously matched dot x: %d, y: %d\n", matched_dot->matched_point->x, matched_dot->matched_point->y ); 
             verboseOut("Stole dot x: %d, y: %d\n", matched_dot->x, matched_dot->y );
             verboseOut("-------------------------\n");
         }
         
         matched_dot->matched = TRUE;
+        matched_dot->strong_matched = TRUE; //In "weak matching" function "weak_matched" is set to true instead.
         matched_dot->matched_point = positionPointer;
         matched_dot->matched_distance = min_distance;
         positionPointer->matched = TRUE;
+        positionPointer->matched_dot = matched_dot;
     } 
 
     return ( dot_was_stolen );
@@ -312,7 +421,9 @@ char matchPosition( Dot* dotList, Position* positionPointer ) {
 int run( SDL_Window* window, SDL_Renderer* renderer ) {
 
     char dots_updated = FALSE,
-         matching_recheck = FALSE;
+         matching_recheck = FALSE,
+         strong_recheck = FALSE,
+         weak_recheck = FALSE;
 
     int x, y,
         i, j;
@@ -363,7 +474,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer ) {
         // Get input from dotdetector
         dots_updated = FALSE;
         numberOfPositions = getDots( &laser_point_buf[0][0], &dots_updated, &seqnr );
-        
+
         //Process dots
         if( dots_updated && numberOfPositions > 0 ) {
         
@@ -385,13 +496,33 @@ int run( SDL_Window* window, SDL_Renderer* renderer ) {
                 ++j;
             }
 
-            //Do crazy matching thing
+            //Do crazy strong matching thing
             while( matching_recheck ) {
+
+                matching_recheck = FALSE;
+                strong_recheck = FALSE;
+                
+                for( i=0; i<numberOfPositions; i++) {
+                
+                    point_pointer = &positionList[i];
+                    if(!point_pointer->matched ) strong_recheck = matchPosition(&dotList[0], point_pointer );
+                    if(strong_recheck) matching_recheck = TRUE; 
+                }
+            }
+            
+            matching_recheck=TRUE;
+            
+            //Do crazy weak matching thing
+            while( matching_recheck ) {
+
+                matching_recheck = FALSE;
+                weak_recheck = FALSE;
 
                 for( i=0; i<numberOfPositions; i++) {
                 
                     point_pointer = &positionList[i];
-                    if(!point_pointer->matched ) matching_recheck = matchPosition(&dotList[0], point_pointer );
+                    if(!point_pointer->matched ){ weak_recheck = weakMatch(&dotList[0], point_pointer ); }                                        
+                    if(weak_recheck) matching_recheck = TRUE;
                 }
             }
             
@@ -403,7 +534,7 @@ int run( SDL_Window* window, SDL_Renderer* renderer ) {
                 }
             }
             
-            //Update vector for all matched dots, spawn balls on them, and draw the dots ( not the balls )
+            //Update vector for all matched dots and spawn balls on them
             for( i=0; i<DD_MAX_DOTS; i++) {
             
                 dot_pointer = &dotList[i];
@@ -643,3 +774,4 @@ error:
     verboseOut( "Done. Bye bye!\n" );
     return ret;
 }
+

@@ -39,9 +39,9 @@ void drawMatchingArea(Dot* dot, SDL_Renderer* renderer){
 
     if(dot->vector.length <= 15) aacircleRGBA(renderer, dot->x, dot->y, 100, 255, 0, 0, 255); 
     
-    if(dot->vector.length > 15) pieRGBA(renderer, dot->x, dot->y, 1.5*(dot->vector.length)+30, (-dot->vector.angle+90)-90, (-dot->vector.angle+90)+90, 255, 0, 0, 255);
+    if(dot->vector.length > 15) pieRGBA(renderer, dot->x, dot->y, 30+(dot->vector.length)*1.5, (-dot->vector.angle+90)-90, (-dot->vector.angle+90)+90, 255, 0, 0, 255);
 
-  //  pieRGBA(renderer, dot->x, dot->y,300, (-dot->vector.angle+90)-45, (-dot->vector.angle+90)+45, 255, 255, 0, 100);
+    pieRGBA(renderer, dot->x, dot->y,300, (-dot->vector.angle+90)-45, (-dot->vector.angle+90)+45, 255, 255, 0, 100);
 
 }
 
@@ -95,6 +95,7 @@ Dot* addDot(Dot* dotList, Position* positionPointer){
             dotList[i].vector.length=0;
             dotList[i].vector.angle=0;
             dotList[i].matched_distance=9999;
+            dotList[i].matched_w_distance=9999;
             
             dotList[i].r = rand() % 0xFF;
             dotList[i].b = rand() % 0xFF;
